@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#1f3a2e">
+  <title>Ventas · Soda</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="marca">Soda <span>· Punto de venta</span></div>
+    <nav class="menu" aria-label="Secciones">
+      <button class="menu-btn activo" data-seccion="venta">Registrar venta</button>
+      <button class="menu-btn" data-seccion="historial">Historial</button>
+      <button class="menu-btn" data-seccion="resumen">Resumen del día</button>
+      <button class="menu-btn" data-seccion="config">Configuración</button>
+    </nav>
+    <button id="btn-pendientes" class="pendientes oculto" type="button"></button>
+  </header>
+
+  <div id="aviso-config" class="aviso aviso-alerta oculto">
+    Falta conectar Google Sheets. Vaya a <strong>Configuración</strong> y pegue la URL de Apps Script y la clave de acceso.
+  </div>
+
+  <main>
+    <!-- ============ 1. REGISTRAR VENTA ============ -->
+    <section id="seccion-venta" class="seccion activa">
+      <div class="venta-layout">
+        <div>
+          <h1 class="titulo">Productos</h1>
+          <div id="productos" class="productos"></div>
+        </div>
+
+        <aside class="carrito" aria-label="Venta actual">
+          <h2 class="titulo">Venta actual</h2>
+          <div id="carrito-vacio" class="vacio">Toque un producto para agregarlo.</div>
+          <table id="carrito-tabla" class="tabla-carrito oculto">
+            <thead>
+              <tr><th>Producto</th><th class="num col-precio">Precio</th><th class="centro">Cant.</th><th class="num">Subtotal</th><th></th></tr>
+            </thead>
+            <tbody id="carrito-lineas"></tbody>
+          </table>
+
+          <div class="total-fila">
+            <span>TOTAL</span>
+            <strong id="carrito-total">₡0</strong>
+          </div>
+
+          <label class="campo">
+            <span>Nombre del cliente (opcional)</span>
+            <input id="cliente" type="text" maxlength="60" autocomplete="off" placeholder="Ej.: Don Carlos">
+          </label>
+
+          <div id="mensaje-venta" class="mensaje oculto" role="status" aria-live="polite"></div>
+
+          <div id="acciones-incierta" class="acciones-incierta oculto">
+            <button id="btn-reintentar" class="btn btn-principal" type="button">Reintentar envío</button>
+            <button id="btn-a-pendientes" class="btn" type="button">Dejar pendiente y atender al siguiente</button>
+            <button id="btn-corregir" class="btn btn-texto" type="button">Corregir productos</button>
+          </div>
+
+          <button id="btn-registrar" class="btn btn-registrar" type="button">REGISTRAR VENTA</button>
+        </aside>
+      </div>
+    </section>
+
+    <!-- ============ 2. HISTORIAL ============ -->
+    <section id="seccion-historial" class="seccion">
+      <h1 class="titulo">Historial de ventas</h1>
+      <div class="filtros">
+        <label class="campo campo-linea">
+          <span>Fecha</span>
+          <input id="historial-fecha" type="date">
+        </label>
+        <button id="btn-historial" class="btn btn-principal" type="button">Consultar</button>
+        <button id="btn-exportar" class="btn" type="button">Exportar a Excel</button>
+      </div>
+      <div id="historial-mensaje" class="mensaje oculto" role="status"></div>
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <thead>
+            <tr><th>ID de venta</th><th>Hora</th><th>Cliente</th><th class="num">Unidades</th><th class="num">Total</th><th></th></tr>
+          </thead>
+          <tbody id="historial-lineas"></tbody>
+        </table>
+      </div>
+      <p class="nota">Las ventas no se pueden modificar ni eliminar desde aquí. Los datos vienen de Google Sheets.</p>
+    </section>
+
+    <!-- ============ 3. RESUMEN DEL DÍA ============ -->
+    <section id="seccion-resumen" class="seccion">
+      <h1 class="titulo">Resumen del día</h1>
+      <div class="filtros">
+        <label class="campo campo-linea">
+          <span>Fecha</span>
+          <input id="resumen-fecha" type="date">
+        </label>
+        <button id="btn-resumen" class="btn btn-principal" type="button">Consultar</button>
+      </div>
+      <div id="resumen-mensaje" class="mensaje oculto" role="status"></div>
+      <div class="tarjetas">
+        <div class="tarjeta"><span>Total vendido</span><strong id="r-total">—</strong></div>
+        <div class="tarjeta"><span>Cantidad de ventas</span><strong id="r-ventas">—</strong></div>
+        <div class="tarjeta"><span>Unidades vendidas</span><strong id="r-unidades">—</strong></div>
+        <div class="tarjeta"><span>Promedio por venta</span><strong id="r-promedio">—</strong></div>
+      </div>
+      <h2 class="subtitulo">Total por producto</h2>
+      <div class="tabla-envoltura">
+        <table class="tabla">
+          <thead><tr><th>Producto</th><th class="num">Unidades</th><th class="num">Total</th></tr></thead>
+          <tbody id="resumen-productos"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ============ 4. CONFIGURACIÓN ============ -->
+    <section id="seccion-config" class="seccion">
+      <h1 class="titulo">Configuración</h1>
+
+      <div class="panel">
+        <h2 class="subtitulo">Productos y precios</h2>
+        <p class="nota">Los cambios se guardan en la pestaña PRODUCTOS de Google Sheets. Las ventas anteriores conservan su precio original.</p>
+        <div id="config-productos" class="config-productos"></div>
+        <div id="productos-mensaje" class="mensaje oculto" role="status"></div>
+        <button id="btn-guardar-productos" class="btn btn-principal" type="button">Guardar productos</button>
+      </div>
+
+      <div class="panel">
+        <h2 class="subtitulo">Conexión con Google Sheets</h2>
+        <p class="nota">Estos datos se guardan solo en este dispositivo. No se suben a GitHub.</p>
+        <label class="campo">
+          <span>URL de la aplicación web de Apps Script</span>
+          <input id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+        </label>
+        <label class="campo">
+          <span>Clave de acceso</span>
+          <input id="cfg-clave" type="password" autocomplete="off">
+        </label>
+        <div id="conexion-mensaje" class="mensaje oculto" role="status"></div>
+        <div class="fila-botones">
+          <button id="btn-guardar-conexion" class="btn btn-principal" type="button">Guardar y probar conexión</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Detalle de una venta -->
+  <dialog id="dialogo-detalle" class="dialogo">
+    <h2 class="subtitulo" id="detalle-titulo">Detalle</h2>
+    <p id="detalle-info" class="nota"></p>
+    <table class="tabla">
+      <thead><tr><th>Producto</th><th class="num">Precio</th><th class="num">Cant.</th><th class="num">Subtotal</th></tr></thead>
+      <tbody id="detalle-lineas"></tbody>
+      <tfoot><tr><th colspan="3">TOTAL</th><th class="num" id="detalle-total"></th></tr></tfoot>
+    </table>
+    <form method="dialog"><button class="btn">Cerrar</button></form>
+  </dialog>
+
+  <!-- Ventas pendientes de confirmar -->
+  <dialog id="dialogo-pendientes" class="dialogo">
+    <h2 class="subtitulo">Ventas pendientes de confirmar</h2>
+    <p class="nota">Estas ventas todavía <strong>no están confirmadas</strong> en Google Sheets. Se reintentan solas cuando hay Internet. Mantienen su identificador original, así que reintentar no las duplica.</p>
+    <ul id="pendientes-lista" class="lista-pendientes"></ul>
+    <div id="pendientes-mensaje" class="mensaje oculto" role="status"></div>
+    <div class="fila-botones">
+      <button id="btn-enviar-pendientes" class="btn btn-principal" type="button">Enviar ahora</button>
+      <form method="dialog"><button class="btn">Cerrar</button></form>
+    </div>
+  </dialog>
+
+  <div id="barra-total" class="barra-total">
+    <span>Total: <strong id="barra-total-monto">₡0</strong></span>
+    <a href="#seccion-venta" id="ir-carrito">Ver venta ↓</a>
+  </div>
+
+  <script src="logica.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

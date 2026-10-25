@@ -1,0 +1,228 @@
+/* =====================================================================
+   styles.css — Apariencia del punto de venta.
+   Pensado primero para tablet; se adapta a computadora y teléfono.
+   ===================================================================== */
+:root {
+  --fondo: #f3f4f1;
+  --superficie: #ffffff;
+  --borde: #d9ddd6;
+  --texto: #1d2420;
+  --texto-suave: #5d6660;
+  --marca: #1f3a2e;
+  --principal: #2f7d4f;
+  --principal-oscuro: #246340;
+  --seleccion: #e6f3eb;
+  --exito-fondo: #e3f4e8; --exito: #1e6b3a;
+  --error-fondo: #fde8e6; --error: #a3261b;
+  --alerta-fondo: #fff4d6; --alerta: #7a5200;
+  --info-fondo: #e8eef7; --info: #23446e;
+  --radio: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 17px;
+  line-height: 1.4;
+  background: var(--fondo);
+  color: var(--texto);
+}
+
+button, input { font: inherit; color: inherit; }
+.oculto { display: none !important; }
+
+/* ---------- Barra superior ---------- */
+.barra {
+  position: sticky; top: 0; z-index: 10;
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--marca); color: #fff;
+}
+.marca { font-weight: 700; font-size: 20px; white-space: nowrap; }
+.marca span { font-weight: 400; opacity: .75; font-size: 16px; }
+.menu { display: flex; gap: 6px; flex-wrap: wrap; flex: 1; }
+.menu-btn {
+  border: 0; background: transparent; color: #dfe9e3;
+  padding: 10px 14px; border-radius: 8px; cursor: pointer; min-height: 44px;
+}
+.menu-btn:hover { background: rgba(255,255,255,.1); }
+.menu-btn.activo { background: #fff; color: var(--marca); font-weight: 600; }
+.pendientes {
+  border: 0; border-radius: 8px; padding: 10px 14px; min-height: 44px;
+  background: #ffd36b; color: #3d2a00; font-weight: 700; cursor: pointer;
+}
+
+.aviso { margin: 12px 16px 0; padding: 12px 14px; border-radius: var(--radio); }
+.aviso-alerta { background: var(--alerta-fondo); color: var(--alerta); }
+
+main { padding: 16px; max-width: 1280px; margin: 0 auto; }
+.seccion { display: none; }
+.seccion.activa { display: block; }
+.titulo { font-size: 20px; margin: 0 0 12px; }
+.subtitulo { font-size: 18px; margin: 18px 0 10px; }
+.nota { color: var(--texto-suave); font-size: 15px; margin: 6px 0 12px; }
+.vacio { color: var(--texto-suave); padding: 18px 0; }
+
+/* ---------- Registrar venta ---------- */
+.venta-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 440px);
+  gap: 20px;
+  align-items: start;
+}
+.productos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 12px;
+}
+.producto {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px;
+  min-height: 130px; padding: 16px;
+  background: var(--superficie); border: 2px solid var(--borde); border-radius: var(--radio);
+  text-align: left; cursor: pointer;
+  touch-action: manipulation;
+}
+.producto:active { background: var(--seleccion); }
+.producto.seleccionado { border-color: var(--principal); background: var(--seleccion); }
+.producto:disabled { opacity: .55; cursor: not-allowed; }
+.producto-nombre { font-weight: 700; font-size: 19px; }
+.producto-precio { font-size: 18px; color: var(--principal-oscuro); font-weight: 600; }
+.producto-cantidad {
+  margin-top: auto; font-size: 15px; color: var(--texto-suave);
+}
+.producto.seleccionado .producto-cantidad { color: var(--principal-oscuro); font-weight: 700; font-size: 18px; }
+
+.carrito {
+  position: sticky; top: 84px;
+  background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio);
+  padding: 16px;
+}
+.tabla-carrito { width: 100%; border-collapse: collapse; font-size: 16px; }
+.tabla-carrito th { font-size: 13px; color: var(--texto-suave); font-weight: 600; text-align: left; padding: 4px 4px 8px; }
+.tabla-carrito td { padding: 8px 3px; border-top: 1px solid var(--borde); vertical-align: middle; }
+.contador { display: inline-flex; align-items: center; gap: 4px; }
+.contador span { min-width: 24px; text-align: center; font-weight: 700; }
+.mini {
+  width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--borde);
+  background: #f7f8f6; font-size: 20px; line-height: 1; cursor: pointer; touch-action: manipulation;
+}
+.mini:disabled { opacity: .4; cursor: not-allowed; }
+.mini-quitar { color: var(--error); font-size: 16px; }
+.precio-unidad { display: none; color: var(--texto-suave); font-size: 13px; }
+
+.total-fila {
+  display: flex; justify-content: space-between; align-items: baseline;
+  margin: 12px 0; padding-top: 12px; border-top: 2px solid var(--texto);
+  font-size: 20px; font-weight: 700;
+}
+.total-fila strong { font-size: 30px; }
+
+.campo { display: flex; flex-direction: column; gap: 4px; margin: 10px 0; }
+.campo span { font-size: 14px; color: var(--texto-suave); }
+.campo input {
+  padding: 12px; min-height: 48px; border: 1px solid var(--borde); border-radius: 8px; background: #fff;
+}
+.campo input:focus { outline: 3px solid #9fd0b2; border-color: var(--principal); }
+.campo input:disabled { background: #f1f2ef; }
+.campo-linea { margin: 0; }
+.campo-check { display: flex; align-items: center; gap: 8px; min-height: 48px; }
+.campo-check input { width: 22px; height: 22px; }
+
+/* ---------- Botones ---------- */
+.btn {
+  min-height: 48px; padding: 10px 18px;
+  border-radius: 10px; border: 1px solid var(--borde); background: #fff;
+  font-weight: 600; cursor: pointer; touch-action: manipulation;
+}
+.btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn-principal { background: var(--principal); border-color: var(--principal); color: #fff; }
+.btn-principal:hover:not(:disabled) { background: var(--principal-oscuro); }
+.btn-texto { border: 0; background: transparent; text-decoration: underline; color: var(--texto-suave); }
+.btn-chico { min-height: 40px; padding: 6px 12px; font-size: 15px; }
+.btn-registrar {
+  width: 100%; min-height: 68px; margin-top: 8px;
+  border: 0; border-radius: var(--radio);
+  background: var(--principal); color: #fff;
+  font-size: 22px; font-weight: 800; letter-spacing: .5px; cursor: pointer;
+}
+.btn-registrar:hover:not(:disabled) { background: var(--principal-oscuro); }
+.btn-registrar:disabled { background: #8aa595; cursor: wait; }
+.acciones-incierta { display: flex; flex-direction: column; gap: 8px; }
+.fila-botones { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+/* ---------- Mensajes ---------- */
+.mensaje { padding: 12px 14px; border-radius: 10px; margin: 10px 0; font-size: 16px; }
+.mensaje-exito { background: var(--exito-fondo); color: var(--exito); font-weight: 600; }
+.mensaje-error { background: var(--error-fondo); color: var(--error); font-weight: 600; }
+.mensaje-alerta { background: var(--alerta-fondo); color: var(--alerta); font-weight: 600; }
+.mensaje-info { background: var(--info-fondo); color: var(--info); }
+
+/* ---------- Historial y resumen ---------- */
+.filtros { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin-bottom: 8px; }
+.tabla-envoltura { overflow-x: auto; background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); }
+.tabla { width: 100%; border-collapse: collapse; }
+.tabla th, .tabla td { padding: 10px 12px; text-align: left; border-bottom: 1px solid var(--borde); white-space: nowrap; }
+.tabla th { font-size: 14px; color: var(--texto-suave); background: #fafbf9; }
+.tabla td.id { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 14px; }
+.num { text-align: right !important; }
+.centro { text-align: center !important; }
+
+.tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 12px 0; }
+.tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 16px; }
+.tarjeta span { display: block; color: var(--texto-suave); font-size: 15px; }
+.tarjeta strong { display: block; font-size: 28px; margin-top: 4px; }
+
+/* ---------- Configuración ---------- */
+.panel { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 4px 16px 16px; margin-bottom: 16px; max-width: 760px; }
+.config-fila { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; border-bottom: 1px solid var(--borde); padding-bottom: 6px; }
+
+/* ---------- Diálogos ---------- */
+.dialogo { border: 0; border-radius: var(--radio); padding: 16px 20px 20px; width: min(640px, calc(100vw - 32px)); }
+.dialogo::backdrop { background: rgba(0,0,0,.45); }
+.dialogo form { margin-top: 14px; }
+.lista-pendientes { list-style: none; padding: 0; margin: 0; }
+.lista-pendientes li { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; border-bottom: 1px solid var(--borde); }
+.lista-pendientes li.rechazada small { color: var(--error); }
+.lista-pendientes small { color: var(--texto-suave); }
+
+/* Barra con el total en teléfonos */
+.barra-total { display: none; }
+
+/* ---------- Pantallas medianas y pequeñas ---------- */
+@media (max-width: 860px) {
+  .venta-layout { grid-template-columns: 1fr; }
+  .carrito { position: static; }
+  .productos { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body[data-seccion="venta"].con-carrito .barra-total {
+    display: flex; justify-content: space-between; align-items: center;
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 9;
+    padding: 12px 16px; background: var(--marca); color: #fff; font-size: 18px;
+  }
+  .barra-total a { color: #fff; font-weight: 700; }
+  body.con-carrito main { padding-bottom: 80px; }
+}
+
+@media (max-width: 520px) {
+  body { font-size: 16px; }
+  .barra { gap: 8px; padding: 8px 10px; }
+  .marca span { display: none; }
+  .menu-btn { padding: 8px 10px; font-size: 15px; }
+  main { padding: 12px; }
+  .producto { min-height: 110px; padding: 12px; }
+  .producto-nombre { font-size: 17px; }
+  .config-fila { grid-template-columns: 1fr 110px; }
+  .config-fila .campo-check { grid-column: 1 / -1; }
+  .tabla-carrito { font-size: 15px; }
+  .tabla-carrito .col-precio { display: none; }
+  .precio-unidad { display: block; }
+  .tabla-carrito td { padding: 8px 2px; }
+  .mini { width: 38px; height: 38px; }
+}
+
+@media (max-width: 400px) {
+  main { padding: 8px; }
+  .carrito { padding: 12px 10px; }
+  .mini { width: 34px; height: 38px; }
+}
