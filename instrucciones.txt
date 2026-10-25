@@ -1,0 +1,570 @@
+==================================================================
+ SISTEMA DE VENTAS PARA SODA — INSTRUCCIONES PASO A PASO
+==================================================================
+
+Este documento explica qué hace cada archivo y todo lo que usted
+debe hacer para poner el sistema en funcionamiento.
+
+En cada parte verá dos marcas:
+
+  [YA ESTÁ HECHO]  = ya quedó programado, usted no tiene que hacer nada.
+  [USTED HACE]     = paso que usted debe realizar con su cuenta.
+
+IMPORTANTE: el sistema todavía NO está conectado a ninguna hoja de
+cálculo. La conexión empieza a funcionar cuando usted complete las
+partes 2, 3, 4 y 5. Hasta entonces, la página avisa "Falta conectar
+Google Sheets" y no deja registrar ventas (no finge guardarlas).
+
+
+==================================================================
+ 1. QUÉ HACE CADA ARCHIVO   [YA ESTÁ HECHO]
+==================================================================
+
+sistema-ventas/
+  index.html          La página: las 4 secciones (Registrar venta,
+                      Historial, Resumen del día, Configuración).
+  styles.css          Colores, tamaños y adaptación a tablet,
+                      computadora y teléfono.
+  logica.js           Cálculos: subtotales, total, validaciones,
+                      identificadores de venta y resumen del día.
+  script.js           Funcionamiento de la pantalla: carrito, envío a
+                      Google Sheets, ventas pendientes, historial,
+                      resumen, configuración y exportar a Excel.
+  sw.js               Permite volver a abrir la página aunque falle
+                      Internet (si ya se había abierto antes).
+  instrucciones.txt   Este documento.
+
+  apps-script/
+    Codigo.gs         El "servidor". Se copia dentro de Google Sheets
+                      (Extensiones > Apps Script). Valida las ventas,
+                      evita duplicados y escribe en las pestañas.
+    appsscript.json   Configuración opcional de Apps Script (zona
+                      horaria de Costa Rica). Ver la parte 3, paso 6.
+
+  pruebas/
+    pruebas.html      Abra este archivo en el navegador para ver las
+    pruebas.js        pruebas de cálculos (deben salir todas en verde).
+
+Nada de esto contiene contraseñas ni claves. La clave de acceso se
+escribe solo en Apps Script y en la tablet (ver parte 3).
+
+
+==================================================================
+ 2. CREAR LA HOJA DE CÁLCULO EN GOOGLE SHEETS   [USTED HACE]
+==================================================================
+
+1. Entre a https://sheets.google.com con su cuenta de Google.
+2. Toque "En blanco" para crear una hoja nueva.
+3. Arriba a la izquierda cambie el nombre "Hoja de cálculo sin título"
+   por, por ejemplo: Ventas Soda.
+4. No necesita crear las pestañas a mano. [YA ESTÁ HECHO] El código
+   crea automáticamente estas tres pestañas con sus columnas:
+
+   VENTAS:          ID de venta | Fecha | Hora | Nombre del cliente |
+                    Cantidad total de unidades | Total de la venta |
+                    Estado del registro
+   DETALLE_VENTAS:  ID de venta | Fecha | Nombre del producto |
+                    Precio unitario | Cantidad | Subtotal
+   PRODUCTOS:       ID del producto | Nombre | Precio | Estado
+                    (con los 5 productos y precios de prueba)
+
+   La pestaña "Hoja 1" que trae Google puede quedarse o borrarse.
+
+5. NO comparta esta hoja con nadie que no deba ver las ventas.
+   La página no necesita que la hoja esté compartida.
+
+No cambie los nombres de las pestañas ni el orden de las columnas:
+el código los usa para encontrar los datos.
+
+
+==================================================================
+ 3. CONFIGURAR GOOGLE APPS SCRIPT   [USTED HACE]
+==================================================================
+
+1. Dentro de la hoja "Ventas Soda", vaya al menú
+   Extensiones > Apps Script. Se abre el editor en otra pestaña.
+
+2. A la izquierda verá un archivo llamado "Código.gs". Bórrele todo
+   el contenido.
+
+3. Abra el archivo apps-script/Codigo.gs de este proyecto con el Bloc
+   de notas (o cualquier editor), seleccione todo (Ctrl+A), cópielo
+   (Ctrl+C) y péguelo en el editor de Apps Script (Ctrl+V).
+
+4. Toque el ícono de guardar (disquete) o Ctrl+S.
+   Arriba puede ponerle nombre al proyecto, por ejemplo: Servidor Ventas.
+
+5. CREAR LA CLAVE DE ACCESO (muy importante):
+   a. A la izquierda toque el engranaje "Configuración del proyecto".
+   b. Baje hasta "Propiedades de la secuencia de comandos" y toque
+      "Agregar propiedad de la secuencia de comandos".
+   c. En "Propiedad" escriba exactamente:   CLAVE_ACCESO
+   d. En "Valor" invente una clave larga, por ejemplo cuatro palabras
+      y números:  mango-tortilla-cafe-2026-azul
+      (No use esta de ejemplo. Invente la suya.)
+   e. Toque "Guardar propiedades de la secuencia de comandos".
+   f. Anote la clave en un lugar seguro. La va a escribir en la tablet.
+
+   Esta clave NO se escribe en ningún archivo del proyecto ni se sube
+   a GitHub. Solo existe en Apps Script y en la tablet.
+
+6. Zona horaria: en la misma pantalla de Configuración del proyecto,
+   en "Zona horaria", elija (GMT-06:00) Costa Rica. (El código ya usa
+   la hora de Costa Rica de todos modos, esto es solo por orden.)
+
+7. Crear las pestañas y dar permisos:
+   a. Vuelva al editor (ícono < > "Editor" a la izquierda).
+   b. Arriba, en la lista de funciones, elija "inicializar".
+   c. Toque "Ejecutar".
+   d. Google pedirá permisos: "Revisar permisos" > elija su cuenta.
+   e. Si aparece "Google no ha verificado esta aplicación", toque
+      "Configuración avanzada" y luego "Ir a Servidor Ventas (no
+      seguro)". Es normal: la "aplicación" es su propio código, que
+      solo usted usa. Luego toque "Permitir".
+   f. Vuelva a la hoja de cálculo: deben aparecer las pestañas VENTAS,
+      DETALLE_VENTAS y PRODUCTOS (esta última con los 5 productos).
+
+
+==================================================================
+ 4. DESPLEGAR APPS SCRIPT COMO APLICACIÓN WEB   [USTED HACE]
+==================================================================
+
+1. En el editor de Apps Script toque el botón azul "Implementar" >
+   "Nueva implementación".
+2. Junto a "Seleccionar tipo" toque el engranaje y elija
+   "Aplicación web".
+3. Complete así:
+     Descripción:         Ventas v1
+     Ejecutar como:       Yo (su correo)
+     Quién tiene acceso:  Cualquier persona
+4. Toque "Implementar". Si pide permisos otra vez, acéptelos igual
+   que en la parte 3.
+5. Copie la "URL de la aplicación web". Termina en  /exec  y se ve así:
+     https://script.google.com/macros/s/XXXXXXXXXXXXXXXX/exec
+
+6. Comprobación: pegue esa URL en el navegador. Debe aparecer:
+     El servidor del sistema de ventas está activo.
+   Si aparece eso, el despliegue funciona.
+
+¿POR QUÉ "CUALQUIER PERSONA"?
+   La tablet abre la página sin iniciar sesión en Google, por eso la
+   aplicación web debe aceptar visitas sin cuenta. Esto NO hace pública
+   la hoja de cálculo:
+   - La hoja sigue siendo privada (solo su cuenta la puede abrir).
+   - Cada operación (registrar, consultar, cambiar precios) exige la
+     CLAVE_ACCESO. Sin la clave, el servidor responde "La clave de
+     acceso no es correcta" y no muestra ni guarda nada.
+   - "Ejecutar como: Yo" significa que el código escribe en SU hoja
+     con SUS permisos, sin que la tablet tenga acceso a su cuenta.
+   Riesgo que queda: quien conozca la URL y la clave podría registrar
+   o consultar ventas. Por eso use una clave larga y no la comparta.
+   Si pierde la tablet o sospecha que alguien la conoce, cambie el
+   valor de CLAVE_ACCESO (parte 3, paso 5) y escriba la nueva en la
+   tablet. No hace falta volver a implementar.
+
+COMUNICACIÓN DESDE CLOUDFLARE PAGES (CORS)   [YA ESTÁ HECHO]
+   Apps Script no permite configurar permisos entre dominios (CORS) de
+   la forma habitual. La página ya está programada de la forma que
+   Apps Script acepta: envía los datos como texto (text/plain) por POST
+   y sigue la redirección de Google. Usted no tiene que configurar
+   nada extra. Nota honesta: esto se probó con una simulación del
+   servidor, no con su cuenta real de Google; la prueba real es la
+   parte 9.
+
+SI MÁS ADELANTE CAMBIA EL CÓDIGO DE Codigo.gs:
+   Pegue el código nuevo, guarde, y luego vaya a
+   Implementar > Gestionar implementaciones > lápiz (editar) >
+   Versión: "Nueva versión" > Implementar.
+   Así la URL se mantiene igual. (Si crea una "Nueva implementación",
+   Google le da una URL distinta y tendría que cambiarla en la tablet.)
+
+
+==================================================================
+ 5. QUÉ URL COLOCAR EN LA PÁGINA   [USTED HACE]
+==================================================================
+
+La URL que copió en la parte 4 (la que termina en /exec).
+Se escribe en la página, sección Configuración > "Conexión con Google
+Sheets", junto con la clave. Lo hará en la parte 8, ya con la página
+publicada.
+
+La URL y la clave se guardan SOLO en el navegador de ese dispositivo.
+No se escriben en los archivos ni se suben a GitHub. Si usa la
+página en otro dispositivo (por ejemplo su computadora), debe
+escribirlas también ahí.
+
+
+==================================================================
+ 6. PUBLICAR EL PROYECTO EN GITHUB   [USTED HACE]
+==================================================================
+
+1. Entre a https://github.com e inicie sesión.
+2. Arriba a la derecha toque "+" > "New repository".
+3. Nombre: sistema-ventas.
+   Recomendado: elija "Private" (privado). Cloudflare Pages funciona
+   igual con repositorios privados. (No hay secretos en el código,
+   pero no hay razón para mostrarlo.)
+4. Toque "Create repository".
+5. En la página del repositorio vacío toque el enlace
+   "uploading an existing file".
+6. Descomprima el .zip en su computadora. Abra la carpeta
+   sistema-ventas y arrastre TODO SU CONTENIDO (index.html,
+   styles.css, script.js, logica.js, sw.js, instrucciones.txt y las
+   carpetas apps-script y pruebas) a la ventana de GitHub.
+   Importante: arrastre lo que está DENTRO de la carpeta, no la
+   carpeta sistema-ventas completa, para que index.html quede en la
+   raíz del repositorio.
+7. Abajo escriba un mensaje como "Primera versión" y toque
+   "Commit changes".
+
+Nunca suba a GitHub la clave de acceso ni capturas de pantalla donde
+aparezca.
+
+
+==================================================================
+ 7. DESPLEGAR EN CLOUDFLARE PAGES   [USTED HACE]
+==================================================================
+
+(Cloudflare cambia sus menús con frecuencia; si un nombre no coincide
+exactamente, busque la opción equivalente.)
+
+1. Entre a https://dash.cloudflare.com y cree una cuenta gratuita si
+   no tiene.
+2. En el menú vaya a "Workers y Pages" (Workers & Pages) > "Crear"
+   (Create). Elija la pestaña "Pages" y luego "Conectar a Git"
+   (Connect to Git / Import an existing Git repository).
+3. Autorice a Cloudflare a ver su GitHub y elija el repositorio
+   sistema-ventas.
+4. Configuración de compilación:
+     Framework preset (marco):   None / Ninguno
+     Build command (compilar):   déjelo VACÍO
+     Build output directory:     déjelo vacío o escriba  /
+5. Toque "Guardar e implementar" (Save and Deploy).
+6. Al terminar le dará una dirección como:
+     https://sistema-ventas.pages.dev   (o parecida)
+
+Cada vez que suba cambios a GitHub, Cloudflare publica la nueva
+versión solo, en uno o dos minutos.
+
+Alternativa sin GitHub: en Pages elija "Subir recursos" (Upload
+assets / Direct Upload) y arrastre el contenido de la carpeta. Sirve
+para probar, pero la conexión con GitHub es mejor para actualizar.
+
+
+==================================================================
+ 8. ABRIRLO DESDE LA TABLET   [USTED HACE]
+==================================================================
+
+1. En la tablet abra Chrome (Android) o Safari (iPad).
+2. Escriba la dirección de Cloudflare (https://....pages.dev).
+3. Para que quede como una aplicación:
+     Android/Chrome: menú ⋮ > "Agregar a la pantalla principal".
+     iPad/Safari:    botón Compartir > "Agregar a inicio".
+4. Toque "Configuración".
+5. En "Conexión con Google Sheets" pegue la URL de la parte 4 y la
+   clave de la parte 3. Toque "Guardar y probar conexión".
+6. Debe aparecer:  ✔ Conexión correcta con Google Sheets.
+   Si aparece un error, lea la sección 16 (Problemas comunes).
+7. En la tablet, revise que la fecha y la hora estén correctas
+   (Ajustes > Fecha y hora > automática). Las ventas usan la hora de
+   la tablet.
+
+
+==================================================================
+ 9. REGISTRAR UNA VENTA DE PRUEBA   [USTED HACE]
+==================================================================
+
+1. Toque "Registrar venta" (es la pantalla que abre al inicio).
+2. Toque Hamburguesa dos veces, Papas doraditas una vez y
+   Coca-Cola dos veces.
+3. A la derecha (o abajo en teléfono) debe ver:
+     Hamburguesa      ₡1.500   2   ₡3.000
+     Papas doraditas  ₡1.000   1   ₡1.000
+     Coca-Cola          ₡800   2   ₡1.600
+     TOTAL                         ₡5.600
+4. Pruebe los botones − y + y la ✕ para quitar un producto; el total
+   cambia al instante. Déjelo otra vez en ₡5.600.
+5. Escriba "Prueba" como nombre del cliente (es opcional).
+6. Toque REGISTRAR VENTA. El botón cambia a "ENVIANDO…" y no se puede
+   volver a tocar mientras tanto.
+7. Debe aparecer en verde: ✔ Venta registrada correctamente, con el
+   ID (por ejemplo V-20261025-143510-K7M2QX) y el total.
+   Solo entonces se limpia el carrito.
+
+Si aparece un mensaje amarillo o rojo, la venta NO está confirmada.
+Lea la sección 14.
+
+
+==================================================================
+ 10. COMPROBAR QUE LA VENTA ESTÁ EN GOOGLE SHEETS   [USTED HACE]
+==================================================================
+
+1. Abra la hoja "Ventas Soda".
+2. Pestaña VENTAS: debe haber UNA fila nueva con el ID que mostró la
+   página, fecha, hora, "Prueba", 5 unidades, ₡5.600 y el estado
+   CONFIRMADA.
+3. Pestaña DETALLE_VENTAS: debe haber TRES filas con ese mismo ID:
+   Hamburguesa ₡1.500 x2 = ₡3.000, Papas ₡1.000 x1 = ₡1.000,
+   Coca-Cola ₡800 x2 = ₡1.600.
+   Truco: Ctrl+F y pegue el ID para encontrarlo en cada pestaña.
+4. En la página, vaya a "Historial", toque "Consultar": debe aparecer
+   la venta. Toque "Ver detalle" para ver sus productos.
+5. Vaya a "Resumen del día" > "Consultar": total ₡5.600, 1 venta,
+   5 unidades, promedio ₡5.600.
+
+Sobre la columna "Estado del registro":
+   CONFIRMADA  = venta completa. Son las únicas que se cuentan en el
+                 historial, el resumen y la exportación.
+   EN_PROCESO  = el guardado se interrumpió a la mitad. No se cuenta.
+                 Si la tablet reintenta con el mismo ID, se completa.
+   DESCARTADA  = intento incompleto que el usuario corrigió. No se
+                 cuenta.
+No edite ni borre filas a mano salvo que sepa lo que hace.
+
+Cuando termine de probar, puede borrar las filas de prueba de VENTAS
+y DETALLE_VENTAS directamente en la hoja (seleccione las filas >
+clic derecho > Eliminar filas). La página no permite borrar ventas.
+
+
+==================================================================
+ 11. MODIFICAR UN PRECIO   [USTED HACE]
+==================================================================
+
+1. En la página vaya a "Configuración" > "Productos y precios".
+2. Cambie el nombre o el precio (solo números enteros, sin decimales;
+   puede escribir 2000 o 2.000).
+3. Desmarque "Activo" para ocultar un producto sin borrarlo.
+4. Toque "Guardar productos". Debe aparecer:
+     ✔ Productos guardados en Google Sheets.
+   Se actualiza la pestaña PRODUCTOS y los botones de venta.
+
+[YA ESTÁ HECHO] Las ventas anteriores NO cambian: cada venta guarda
+el precio que tenía en el momento de venderse (columna Precio
+unitario en DETALLE_VENTAS).
+
+También puede cambiar precios directamente en la pestaña PRODUCTOS;
+la página los toma al abrirse. Para agregar un producto nuevo más
+adelante, agregue una fila en PRODUCTOS con un ID nuevo (P006, P007…),
+nombre, precio y ACTIVO, y recargue la página.
+
+Nota: si cambia el NOMBRE de un producto a mitad del día, el resumen
+de ese día lo mostrará en dos filas (nombre viejo y nombre nuevo).
+
+
+==================================================================
+ 12. EXPORTAR LAS VENTAS A EXCEL   [USTED HACE]
+==================================================================
+
+1. Vaya a "Historial", elija la fecha y toque "Exportar a Excel".
+2. Se descarga un archivo ventas_AAAA-MM-DD.xlsx con dos hojas:
+     Ventas:   fecha, hora, ID, cliente, unidades, total de cada venta
+               y una fila final "TOTAL DEL DÍA".
+     Detalle:  fecha, hora, ID, cliente, producto, cantidad, precio
+               unitario, subtotal y total de la venta.
+3. El total del archivo debe ser igual al del Resumen del día y al de
+   la pestaña VENTAS para esa fecha.
+
+Exportar es solo una copia para usted. Las ventas ya se guardan solas
+en Google Sheets; no necesita exportar después de cada venta.
+
+Si la librería de Excel no carga (por ejemplo un bloqueo de red), la
+página descarga un .csv que Excel también abre, y lo avisa.
+
+
+==================================================================
+ 13. COPIA DE SEGURIDAD   [USTED HACE]
+==================================================================
+
+Google Sheets guarda en la nube, pero conviene tener copias:
+
+1. Semanal: en la hoja, Archivo > Descargar > Microsoft Excel (.xlsx).
+   Guarde el archivo en su computadora o en una memoria USB.
+2. Mensual: Archivo > Crear una copia. Llámela por ejemplo
+   "Ventas Soda - respaldo 2026-10".
+3. Si alguien borra algo por error: Archivo > Historial de versiones >
+   Ver historial de versiones, y restaure una versión anterior.
+4. El código queda respaldado en GitHub. Guarde también el .zip.
+5. Anote la CLAVE_ACCESO en un lugar seguro fuera de la tablet.
+
+
+==================================================================
+ 14. QUÉ HACER SI FALLA INTERNET   [YA ESTÁ HECHO + USTED HACE]
+==================================================================
+
+[YA ESTÁ HECHO]
+- La página nunca dice "Venta registrada" sin que Google Sheets lo
+  haya confirmado.
+- Si se corta la conexión al registrar, aparece en amarillo:
+  "La venta NO ha sido confirmada". El carrito NO se borra y queda
+  bloqueado (para no cambiar una venta que quizá sí llegó).
+  Tiene tres opciones:
+    · "Reintentar envío": vuelve a mandar la MISMA venta con el MISMO
+      ID. Si ya había llegado, el servidor lo detecta y no la duplica.
+    · "Dejar pendiente y atender al siguiente": la venta pasa a la
+      lista de pendientes (con su ID original) y el carrito queda
+      libre. Arriba aparece un aviso "⚠ 1 venta pendiente".
+    · "Corregir productos": pregunta al servidor si la venta llegó.
+      Si no llegó, la anula para siempre y le deja editar el carrito.
+      Si sí llegó, se lo dice. Necesita Internet.
+- Si el servidor responde que la venta es inválida (por ejemplo, la
+  clave no es correcta), el mensaje es rojo: "La venta NO se guardó"
+  y el carrito queda libre para corregir.
+- Las ventas pendientes se reintentan solas cuando vuelve Internet,
+  al abrir la página y cada minuto. También puede tocar el aviso
+  "⚠ ventas pendientes" > "Enviar ahora".
+- Las pendientes NUNCA se borran solas. Solo se pueden quitar si el
+  servidor las rechazó (y la página le pide confirmar).
+- Si la página se cierra o se recarga mientras envía una venta, al
+  abrirla otra vez la recupera y le pide reintentar.
+- Si ya había abierto la página antes, se puede volver a abrir sin
+  Internet.
+
+[USTED HACE]
+- Mientras haya ventas pendientes: NO borre los datos del navegador,
+  NO use modo incógnito y NO desinstale el navegador. Las pendientes
+  están guardadas solo en esa tablet hasta que se confirmen.
+- Si Internet va a fallar mucho rato, anote también en papel las
+  ventas pendientes como respaldo.
+- Revise que el aviso "⚠ ventas pendientes" desaparezca cuando vuelva
+  la conexión. Las pendientes NO aparecen en el Resumen hasta que se
+  confirmen.
+- Las ventas pendientes con más de 30 días son rechazadas por el
+  servidor; envíelas antes.
+
+RIESGOS QUE NO SE PUEDEN ELIMINAR (y cómo se manejan)
+- Si la tablet se pierde o se dañan sus datos antes de enviar las
+  pendientes, esas ventas se pierden. → Respaldo en papel cuando no
+  hay Internet.
+- Si la hora de la tablet está mal, la venta queda con fecha/hora
+  incorrecta. Si está más de 10 minutos en el futuro, el servidor la
+  rechaza. → Use fecha y hora automáticas.
+- Google Apps Script a veces tarda varios segundos o falla por un
+  momento. → El sistema espera hasta 30 segundos y luego ofrece
+  reintentar sin duplicar.
+- Google tiene límites de uso diarios para cuentas gratuitas; una
+  soda pequeña no debería llegar a ellos, pero si ocurre, las ventas
+  quedan pendientes y se envían después.
+- Quien tenga la URL y la clave puede registrar ventas. → Clave larga
+  y cambiarla si hace falta.
+
+
+==================================================================
+ 15. COMPROBAR QUE NO SE DUPLICAN LAS VENTAS   [USTED HACE]
+==================================================================
+
+[YA ESTÁ HECHO]
+- Cada venta recibe un ID único al tocar REGISTRAR VENTA.
+- El botón se desactiva mientras envía (un doble toque no crea dos).
+- El servidor usa un bloqueo (LockService) para atender una venta a
+  la vez y revisa si el ID ya existe antes de escribir. Si ya existe
+  y está CONFIRMADA, no la escribe otra vez.
+- Si un guardado quedó a la mitad (EN_PROCESO), el reintento borra el
+  detalle incompleto y lo vuelve a escribir: nunca queda doble.
+
+PRUEBA EN SU HOJA REAL:
+1. Prueba de doble toque: arme una venta y toque REGISTRAR VENTA
+   varias veces muy rápido. En VENTAS debe aparecer UNA sola fila.
+2. Prueba de corte de Internet:
+   a. Arme una venta.
+   b. Active el "modo avión" de la tablet.
+   c. Toque REGISTRAR VENTA. Debe salir el aviso amarillo y el carrito
+      debe seguir ahí. (No debe decir "registrada".)
+   d. Quite el modo avión y toque "Reintentar envío".
+   e. Debe decir "registrada correctamente" (o "ya estaba guardada").
+   f. En VENTAS busque el ID con Ctrl+F: debe aparecer UNA sola vez.
+3. Prueba de pendientes: repita a-c, toque "Dejar pendiente…", quite
+   el modo avión y espere el mensaje de confirmación. Revise que el ID
+   aparezca una sola vez.
+4. Fórmula para revisar toda la hoja: en una celda vacía de otra
+   pestaña escriba (hoja en español):
+      =CONTARA(VENTAS!A2:A)-CONTAR.UNICO(VENTAS!A2:A)
+   o (hoja en inglés):
+      =COUNTA(VENTAS!A2:A)-COUNTUNIQUE(VENTAS!A2:A)
+   El resultado debe ser 0. Si da más de 0, hay IDs repetidos.
+
+
+==================================================================
+ 16. PROBLEMAS COMUNES
+==================================================================
+
+"La clave de acceso no es correcta"
+   → La clave de la tablet no coincide con CLAVE_ACCESO. Revise
+     mayúsculas, espacios al inicio o al final.
+
+"El servidor no tiene CLAVE_ACCESO configurada"
+   → Falta la parte 3, paso 5.
+
+"No hubo respuesta del servidor" o "respondió algo inesperado"
+   → Revise que haya Internet.
+   → Revise que la URL termine en /exec (no en /dev).
+   → Revise en Apps Script > Implementar > Gestionar implementaciones
+     que "Quién tiene acceso" diga "Cualquier persona".
+   → Abra la URL en el navegador: debe decir "El servidor del sistema
+     de ventas está activo".
+
+"La fecha de la venta está en el futuro"
+   → Corrija la fecha y hora de la tablet.
+
+Cambié Codigo.gs y no se nota el cambio
+   → Debe publicar una "Nueva versión" (parte 4, último apartado).
+
+Cambié la página en GitHub y la tablet muestra la versión vieja
+   → Espere 2 minutos y recargue. Si sigue igual, cierre la pestaña y
+     ábrala de nuevo.
+
+
+==================================================================
+ 17. PRUEBAS: QUÉ SE PROBÓ Y QUÉ FALTA PROBAR CON SU CUENTA
+==================================================================
+
+Se ejecutaron estas pruebas antes de entregar (con resultados
+correctos):
+
+  A. Cálculos y validaciones (pruebas/pruebas.html): 11 de 11.
+  B. Codigo.gs ejecutado con una SIMULACIÓN de Google Sheets en la
+     computadora del desarrollador: 16 de 16 (clave, creación de
+     pestañas, 1 fila en VENTAS + 3 en DETALLE_VENTAS, reintentos sin
+     duplicar, guardado a medias, validación en servidor, cambio de
+     precio, resumen, bloqueo ocupado).
+  C. La página real en un navegador Chrome automatizado, conectada a
+     esa simulación: 19 de 19 (total ₡2.300 y ₡5.600, venta vacía,
+     doble toque, corte de conexión, respuesta perdida sin duplicar,
+     recarga durante el envío, pendientes, cambio de precio,
+     historial, resumen, exportación, teléfono sin desbordes).
+  D. El archivo .xlsx exportado se abrió con un lector de Excel y sus
+     totales coincidieron con la hoja simulada.
+
+Estado de las 10 pruebas obligatorias:
+
+  PRUEBA 1  (₡2.300) .......................... PASÓ (A y C)
+  PRUEBA 2  (₡5.600) .......................... PASÓ (A y C)
+  PRUEBA 3  (venta vacía rechazada) ........... PASÓ (A y C)
+  PRUEBA 4  (cantidad/precio inválido) ........ PASÓ (A y B)
+  PRUEBA 5  (VENTAS + DETALLE_VENTAS) ......... PASÓ con la simulación.
+            FALTA con su hoja real → partes 9 y 10.
+  PRUEBA 6  (reintento sin duplicar) .......... PASÓ con la simulación.
+            FALTA con su hoja real → parte 15.
+  PRUEBA 7  (cambio de precio) ................ PASÓ con la simulación.
+            FALTA con su hoja real → parte 11, luego revise que la
+            venta de prueba siga en ₡1.500 en DETALLE_VENTAS.
+  PRUEBA 8  (falla de conexión) ............... PASÓ (C). Repítala con
+            el modo avión → parte 15, punto 2.
+  PRUEBA 9  (resumen = hojas) ................. PASÓ con la simulación.
+            FALTA con su hoja real → compare Resumen del día con la
+            suma de la columna "Total de la venta" de ese día.
+  PRUEBA 10 (exportación a Excel) ............. PASÓ con la simulación.
+            FALTA con su hoja real → parte 12, abra el archivo en Excel
+            y compare el TOTAL DEL DÍA.
+
+"Simulación" significa que se imitó el comportamiento de Google
+Sheets y Apps Script en la computadora. La conexión con SU cuenta de
+Google y SU sitio de Cloudflare no se pudo probar desde aquí porque
+depende de pasos que usted realiza. Hasta completar las partes 2 a 10,
+no considere el sistema listo para uso real.
+
+Nota técnica: el servidor recalcula subtotales y totales y rechaza la
+venta si no coinciden con lo que envió la tablet, valida que precios y
+cantidades sean enteros positivos y que el producto exista. Acepta el
+precio que tenía la tablet al momento de vender (no el precio actual
+de PRODUCTOS) para que una venta pendiente enviada horas después
+conserve el precio con que se cobró.
