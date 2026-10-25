@@ -575,27 +575,60 @@
     $('cfg-clave').value = estado.config.clave || '';
     var cont = $('config-productos');
     cont.textContent = '';
-    estado.productos.forEach(function (p) {
-      var activo = el('input', { type: 'checkbox', 'data-campo': 'activo' });
-      activo.checked = p.activo;
-      cont.appendChild(el('div', { clase: 'config-fila', 'data-id': p.id }, [
-        el('label', { clase: 'campo' }, [el('span', { texto: 'Nombre' }), el('input', { type: 'text', maxlength: '40', value: p.nombre, 'data-campo': 'nombre' })]),
-        el('label', { clase: 'campo' }, [el('span', { texto: 'Precio (₡)' }), el('input', { type: 'text', inputmode: 'numeric', value: String(p.precio), 'data-campo': 'precio' })]),
-        el('label', { clase: 'campo-check' }, [activo, el('span', { texto: 'Activo' })])
-      ]));
-    });
+    estado.productos.forEach(function (p) { cont.appendChild(filaProducto(p)); });
+  }
+
+  /** Fila editable de un producto. Sin id = producto nuevo todavía sin guardar. */
+  function filaProducto(p) {
+    var nuevo = !p.id;
+    var activo = el('input', { type: 'checkbox', 'data-campo': 'activo' });
+    activo.checked = p.activo;
+    var fila = el('div', { clase: 'config-fila' + (nuevo ? ' config-fila-nueva' : ''), 'data-id': p.id || '' }, [
+      el('label', { clase: 'campo' }, [el('span', { texto: nuevo ? 'Nombre (producto nuevo)' : 'Nombre' }), el('input', { type: 'text', maxlength: '40', value: p.nombre, 'data-campo': 'nombre', placeholder: 'Ej.: Gallo pinto' })]),
+      el('label', { clase: 'campo' }, [el('span', { texto: 'Precio (₡)' }), el('input', { type: 'text', inputmode: 'numeric', value: p.precio ? String(p.precio) : '', 'data-campo': 'precio', placeholder: 'Ej.: 1500' })]),
+      el('label', { clase: 'campo-check' }, [activo, el('span', { texto: 'Activo' })])
+    ]);
+    if (nuevo) {
+      // Un producto nuevo se puede quitar antes de guardarlo; después solo se desactiva
+      fila.appendChild(el('button', {
+        clase: 'btn btn-texto', type: 'button', texto: 'Quitar',
+        onclick: function () { fila.remove(); }
+      }));
+    }
+    return fila;
+  }
+
+  function agregarProducto() {
+    var fila = filaProducto({ id: '', nombre: '', precio: 0, activo: true });
+    $('config-productos').appendChild(fila);
+    ocultarMensaje('productos-mensaje');
+    fila.querySelector('[data-campo="nombre"]').focus();
   }
 
   function leerFormularioProductos() {
     var errores = [];
+    var nombres = {};
     var lista = Array.prototype.map.call(document.querySelectorAll('.config-fila'), function (fila) {
       var nombre = fila.querySelector('[data-campo="nombre"]').value.trim();
       var precio = L.leerPrecio(fila.querySelector('[data-campo="precio"]').value);
       if (!nombre) errores.push('Hay un producto sin nombre.');
-      if (precio === null) errores.push('El precio de "' + (nombre || fila.dataset.id) + '" no es válido (use solo números enteros, mayor que 0).');
-      return { id: fila.dataset.id, nombre: nombre, precio: precio, activo: fila.querySelector('[data-campo="activo"]').checked };
+      else if (nombres[nombre.toLowerCase()]) errores.push('Hay dos productos llamados "' + nombre + '".');
+      nombres[nombre.toLowerCase()] = true;
+      if (precio === null) errores.push('El precio de "' + (nombre || 'producto nuevo') + '" no es válido (use solo números enteros, mayor que 0).');
+      return { id: fila.dataset.id || null, nombre: nombre, precio: precio, activo: fila.querySelector('[data-campo="activo"]').checked };
     });
     return { lista: lista, errores: errores };
+  }
+
+  /** Sin Google Sheets conectado, los productos nuevos reciben su ID aquí mismo. */
+  function asignarIdsLocales(lista) {
+    var siguiente = lista.reduce(function (max, p) {
+      var m = /^P(\d+)$/.exec(p.id || '');
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0) + 1;
+    return lista.map(function (p) {
+      return p.id ? p : Object.assign({}, p, { id: 'P' + ('00' + siguiente++).slice(-3) });
+    });
   }
 
   function aplicarProductos(lista) {
@@ -618,7 +651,8 @@
     var datos = leerFormularioProductos();
     if (datos.errores.length) return mostrarMensaje('productos-mensaje', 'error', datos.errores.join('\n'));
     if (!estado.config.url) {
-      aplicarProductos(datos.lista);
+      aplicarProductos(asignarIdsLocales(datos.lista));
+      pintarConfig();
       return mostrarMensaje('productos-mensaje', 'alerta', 'Guardado solo en este dispositivo, porque Google Sheets todavía no está conectado.');
     }
     var boton = $('btn-guardar-productos');
@@ -628,10 +662,16 @@
       .then(function (r) {
         aplicarProductos(r.productos);
         pintarConfig();
-        mostrarMensaje('productos-mensaje', 'exito', '✔ Productos guardados en Google Sheets.');
+        mostrarMensaje('productos-mensaje', 'exito', '✔ Productos guardados en Google Sheets.' +
+          (r.creados ? ' Se agregó ' + r.creados + ' producto(s) nuevo(s); ya aparecen en Registrar venta.' : ''));
       })
       .catch(function (e) {
-        mostrarMensaje('productos-mensaje', 'error', 'Los cambios NO se guardaron. ' + e.message);
+        var texto = 'Los cambios NO se guardaron. ' + e.message;
+        // Codigo.gs anterior a esta versión no sabe crear productos
+        if (/sin identificador/i.test(e.message)) {
+          texto += '\nPara agregar productos hay que actualizar Codigo.gs en Apps Script y publicar una "Nueva versión" (ver instrucciones.txt, parte 11).';
+        }
+        mostrarMensaje('productos-mensaje', 'error', texto);
       })
       .finally(function () { boton.disabled = false; });
   }
@@ -683,6 +723,7 @@
     $('btn-resumen').addEventListener('click', cargarResumen);
     $('btn-exportar').addEventListener('click', exportarExcel);
     $('btn-guardar-productos').addEventListener('click', guardarProductos);
+    $('btn-agregar-producto').addEventListener('click', agregarProducto);
     $('btn-guardar-conexion').addEventListener('click', guardarConexion);
     $('btn-pendientes').addEventListener('click', function () { ocultarMensaje('pendientes-mensaje'); $('dialogo-pendientes').showModal(); });
     $('btn-enviar-pendientes').addEventListener('click', function () { enviarPendientes(true); });

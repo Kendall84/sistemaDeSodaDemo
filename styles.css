@@ -123,6 +123,7 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
 .campo span { font-size: 14px; color: var(--texto-suave); }
 .campo input {
   padding: 12px; min-height: 48px; border: 1px solid var(--borde); border-radius: 8px; background: #fff;
+  width: 100%; min-width: 0;
 }
 .campo input:focus { outline: 3px solid #9fd0b2; border-color: var(--principal); }
 .campo input:disabled { background: #f1f2ef; }
@@ -176,7 +177,9 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
 
 /* ---------- Configuración ---------- */
 .panel { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 4px 16px 16px; margin-bottom: 16px; max-width: 760px; }
-.config-fila { display: grid; grid-template-columns: 1fr 160px auto; gap: 12px; align-items: end; border-bottom: 1px solid var(--borde); padding-bottom: 6px; }
+.config-fila { display: grid; grid-template-columns: minmax(0, 1fr) 160px auto auto; gap: 12px; align-items: end; border-bottom: 1px solid var(--borde); padding-bottom: 6px; }
+.config-fila-nueva { background: var(--seleccion); border-radius: 8px; padding: 0 8px 6px; }
+#config-productos { margin-bottom: 12px; }
 
 /* ---------- Diálogos ---------- */
 .dialogo { border: 0; border-radius: var(--radio); padding: 16px 20px 20px; width: min(640px, calc(100vw - 32px)); }
@@ -212,8 +215,8 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
   main { padding: 12px; }
   .producto { min-height: 110px; padding: 12px; }
   .producto-nombre { font-size: 17px; }
-  .config-fila { grid-template-columns: 1fr 110px; }
-  .config-fila .campo-check { grid-column: 1 / -1; }
+  .config-fila { grid-template-columns: minmax(0, 1fr) 110px; }
+  .config-fila .campo-check { grid-column: 1; }
   .tabla-carrito { font-size: 15px; }
   .tabla-carrito .col-precio { display: none; }
   .precio-unidad { display: block; }

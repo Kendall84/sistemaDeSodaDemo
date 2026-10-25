@@ -120,10 +120,13 @@
 
       <div class="panel">
         <h2 class="subtitulo">Productos y precios</h2>
-        <p class="nota">Los cambios se guardan en la pestaña PRODUCTOS de Google Sheets. Las ventas anteriores conservan su precio original.</p>
+        <p class="nota">Los cambios se guardan en la pestaña PRODUCTOS de Google Sheets. Las ventas anteriores conservan su precio original. Para agregar uno, toque "+ Agregar producto", complete nombre y precio y luego "Guardar productos".</p>
         <div id="config-productos" class="config-productos"></div>
         <div id="productos-mensaje" class="mensaje oculto" role="status"></div>
-        <button id="btn-guardar-productos" class="btn btn-principal" type="button">Guardar productos</button>
+        <div class="fila-botones">
+          <button id="btn-agregar-producto" class="btn" type="button">+ Agregar producto</button>
+          <button id="btn-guardar-productos" class="btn btn-principal" type="button">Guardar productos</button>
+        </div>
       </div>
 
       <div class="panel">
