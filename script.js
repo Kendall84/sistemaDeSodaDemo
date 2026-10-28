@@ -13,7 +13,8 @@
   /* Almacenamiento local (solo en este dispositivo)                    */
   /* ------------------------------------------------------------------ */
   var CLAVES = {
-    config: 'sv_config',          // { url, clave }
+    config: 'sv_config',          // { url } de Apps Script
+    sesion: 'sv_sesion',          // { token, usuario, rol } (la contraseña nunca se guarda)
     productos: 'sv_productos',    // copia de la pestaña PRODUCTOS
     carrito: 'sv_carrito',        // venta que se está armando
     cliente: 'sv_cliente',
@@ -46,7 +47,8 @@
   ];
 
   var estado = {
-    config: leer(CLAVES.config, { url: '', clave: '' }),
+    config: { url: (leer(CLAVES.config, {}) || {}).url || '' },
+    sesion: leer(CLAVES.sesion, null),
     productos: leer(CLAVES.productos, PRODUCTOS_INICIALES),
     carrito: leer(CLAVES.carrito, []),
     intento: leer(CLAVES.intento, null),       // { venta, estado: 'enviando' | 'incierta' }
@@ -89,7 +91,7 @@
   /* Comunicación con Google Apps Script                                */
   /* ------------------------------------------------------------------ */
 
-  // El servidor respondió que NO guardó (dato inválido, clave, ocupado...)
+  // El servidor respondió que NO guardó (dato inválido, sesión vencida, ocupado...)
   function ErrorServidor(mensaje, codigo) { this.message = mensaje; this.codigo = codigo; }
   // No se llegó a enviar nada (falta configuración)
   function ErrorConfig(mensaje) { this.message = mensaje; }
@@ -98,15 +100,22 @@
 
   var TIEMPO_ESPERA_MS = 30000;
 
+  // Errores del servidor que NO dicen nada sobre la venta en sí: se puede reintentar
+  var CODIGOS_TEMPORALES = ['OCUPADO', 'SESION'];
+
   function llamar(accion, datos) {
     var cfg = estado.config;
-    if (!cfg.url || !cfg.clave) {
-      return Promise.reject(new ErrorConfig('Falta configurar la URL de Apps Script y la clave en Configuración.'));
+    if (!cfg.url) {
+      return Promise.reject(new ErrorConfig('Falta configurar la URL de Apps Script (en la pantalla de inicio de sesión).'));
+    }
+    var publica = accion === 'probar' || accion === 'login';
+    if (!publica && !estado.sesion) {
+      return Promise.reject(new ErrorServidor('Debe iniciar sesión.', 'SESION'));
     }
     if (!navigator.onLine) {
       return Promise.reject(new ErrorRed('El dispositivo no tiene conexión a Internet.'));
     }
-    var cuerpo = Object.assign({ accion: accion, clave: cfg.clave }, datos || {});
+    var cuerpo = Object.assign({ accion: accion }, publica ? {} : { token: estado.sesion.token }, datos || {});
     var control = new AbortController();
     var temporizador = setTimeout(function () { control.abort(); }, TIEMPO_ESPERA_MS);
 
@@ -128,6 +137,7 @@
       })
       .then(function (json) {
         if (!json || json.ok !== true) {
+          if (json && json.codigo === 'SESION') cerrarSesionLocal(json.error);
           throw new ErrorServidor((json && json.error) || 'El servidor rechazó la operación.', json && json.codigo);
         }
         return json;
@@ -271,6 +281,7 @@
           // El servidor dijo claramente que NO guardó: se libera el carrito para corregir
           estado.intento = null;
           guardar(CLAVES.intento, null);
+          if (e.codigo === 'PRECIO') cargarProductosDelServidor();   // trae los precios nuevos al carrito
           mostrarMensaje('mensaje-venta', 'error',
             'La venta NO se guardó. ' + e.message + '\nLos productos siguen en el carrito; corrija y vuelva a presionar REGISTRAR VENTA.');
         } else {
@@ -388,7 +399,7 @@
             confirmadas++;
           })
           .catch(function (e) {
-            if (e instanceof ErrorServidor && e.codigo !== 'OCUPADO') { p.rechazada = true; p.error = e.message; }
+            if (e instanceof ErrorServidor && CODIGOS_TEMPORALES.indexOf(e.codigo) === -1) { p.rechazada = true; p.error = e.message; }
             else { p.error = e.message; sinConexion = e; }
           })
           .then(function () { guardar(CLAVES.pendientes, estado.pendientes); });
@@ -499,7 +510,8 @@
   /* ------------------------------------------------------------------ */
   /* Exportar a Excel                                                   */
   /* ------------------------------------------------------------------ */
-  var URL_SHEETJS = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+  // Copia local de SheetJS 0.18.5 (no depende de servidores externos)
+  var URL_SHEETJS = 'vendor/xlsx.full.min.js';
 
   function cargarSheetJS() {
     if (window.XLSX) return Promise.resolve(window.XLSX);
@@ -572,7 +584,6 @@
   /* ------------------------------------------------------------------ */
   function pintarConfig() {
     $('cfg-url').value = estado.config.url || '';
-    $('cfg-clave').value = estado.config.clave || '';
     var cont = $('config-productos');
     cont.textContent = '';
     estado.productos.forEach(function (p) { cont.appendChild(filaProducto(p)); });
@@ -677,35 +688,90 @@
   }
 
   function cargarProductosDelServidor() {
-    if (!estado.config.url) return Promise.resolve();
+    if (!estado.config.url || !estado.sesion) return Promise.resolve();
     return llamar('obtenerProductos').then(function (r) {
       if (Array.isArray(r.productos) && r.productos.length) aplicarProductos(r.productos);
     }).catch(function () { /* se usan los productos guardados en el dispositivo */ });
   }
 
-  function guardarConexion() {
-    var url = $('cfg-url').value.trim();
-    var clave = $('cfg-clave').value;
+  /** Guarda la URL de Apps Script (campo y mensaje según la pantalla) y la prueba. */
+  function guardarConexion(idCampo, idMensaje) {
+    var url = $(idCampo).value.trim();
     if (!/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) {
-      return mostrarMensaje('conexion-mensaje', 'error', 'La URL debe tener la forma https://script.google.com/macros/s/…/exec');
+      return mostrarMensaje(idMensaje, 'error', 'La URL debe tener la forma https://script.google.com/macros/s/…/exec');
     }
-    if (!clave) return mostrarMensaje('conexion-mensaje', 'error', 'Escriba la clave de acceso.');
-    estado.config = { url: url, clave: clave };
+    estado.config = { url: url };
     guardar(CLAVES.config, estado.config);
     pintarAvisoConfig();
-    mostrarMensaje('conexion-mensaje', 'info', 'Probando conexión…');
+    mostrarMensaje(idMensaje, 'info', 'Probando conexión…');
     llamar('probar')
-      .then(function () {
-        mostrarMensaje('conexion-mensaje', 'exito', '✔ Conexión correcta con Google Sheets.');
-        return cargarProductosDelServidor().then(pintarConfig).then(function () { enviarPendientes(); });
-      })
-      .catch(function (e) {
-        mostrarMensaje('conexion-mensaje', 'error', 'La conexión falló: ' + e.message);
-      });
+      .then(function () { mostrarMensaje(idMensaje, 'exito', '✔ Conexión correcta con Google Sheets.'); })
+      .catch(function (e) { mostrarMensaje(idMensaje, 'error', 'La conexión falló: ' + e.message); });
   }
 
   function pintarAvisoConfig() {
-    $('aviso-config').classList.toggle('oculto', !!(estado.config.url && estado.config.clave));
+    var falta = !estado.config.url;
+    $('aviso-config').classList.toggle('oculto', !falta);
+    if (falta) $('login-conexion').open = true;
+    $('login-url').value = estado.config.url || '';
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Inicio de sesión                                                   */
+  /* ------------------------------------------------------------------ */
+  function pintarSesion() {
+    var s = estado.sesion;
+    document.body.classList.toggle('sin-sesion', !s);
+    $('usuario-actual').textContent = s ? s.usuario + (s.rol === 'ADMIN' ? ' (admin)' : '') : '';
+    // Solo ADMIN ve Configuración (el servidor también lo exige)
+    var admin = !!(s && s.rol === 'ADMIN');
+    document.querySelector('.menu-btn[data-seccion="config"]').classList.toggle('oculto', !admin);
+    if (!admin && $('seccion-config').classList.contains('activa')) irA('venta');
+    if (!s) setTimeout(function () { $('login-usuario').focus(); }, 0);
+  }
+
+  function iniciarSesion(ev) {
+    ev.preventDefault();
+    var usuario = $('login-usuario').value.trim();
+    var contrasena = $('login-contrasena').value;
+    if (!usuario || !contrasena) return mostrarMensaje('login-mensaje', 'error', 'Escriba usuario y contraseña.');
+    var boton = $('btn-login');
+    boton.disabled = true;
+    mostrarMensaje('login-mensaje', 'info', 'Verificando…');
+    llamar('login', { usuario: usuario, contrasena: contrasena })
+      .then(function (r) {
+        estado.sesion = { token: r.token, usuario: r.usuario, rol: r.rol };
+        guardar(CLAVES.sesion, estado.sesion);
+        $('login-contrasena').value = '';
+        ocultarMensaje('login-mensaje');
+        pintarSesion();
+        return cargarProductosDelServidor().then(function () { enviarPendientes(); });
+      })
+      .catch(function (e) {
+        $('login-contrasena').value = '';
+        mostrarMensaje('login-mensaje', 'error', e.message);
+      })
+      .finally(function () { boton.disabled = false; });
+  }
+
+  /** Borra la sesión de este dispositivo. El carrito y las pendientes se conservan. */
+  function cerrarSesionLocal(motivo) {
+    estado.sesion = null;
+    guardar(CLAVES.sesion, null);
+    pintarSesion();
+    if (motivo) mostrarMensaje('login-mensaje', 'alerta', motivo);
+  }
+
+  function salir() {
+    var aviso = estado.pendientes.length
+      ? '\nHay ' + estado.pendientes.length + ' venta(s) pendiente(s): se quedan guardadas en este dispositivo y se enviarán al volver a entrar.'
+      : '';
+    if (!confirm('¿Cerrar sesión?' + aviso)) return;
+    var s = estado.sesion;
+    cerrarSesionLocal();
+    if (s && estado.config.url) {
+      fetch(estado.config.url, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ accion: 'logout', token: s.token }) }).catch(function () {});
+    }
   }
 
   /* ------------------------------------------------------------------ */
@@ -724,7 +790,10 @@
     $('btn-exportar').addEventListener('click', exportarExcel);
     $('btn-guardar-productos').addEventListener('click', guardarProductos);
     $('btn-agregar-producto').addEventListener('click', agregarProducto);
-    $('btn-guardar-conexion').addEventListener('click', guardarConexion);
+    $('btn-guardar-conexion').addEventListener('click', function () { guardarConexion('cfg-url', 'conexion-mensaje'); });
+    $('btn-login-conexion').addEventListener('click', function () { guardarConexion('login-url', 'login-conexion-mensaje'); });
+    $('form-login').addEventListener('submit', iniciarSesion);
+    $('btn-salir').addEventListener('click', salir);
     $('btn-pendientes').addEventListener('click', function () { ocultarMensaje('pendientes-mensaje'); $('dialogo-pendientes').showModal(); });
     $('btn-enviar-pendientes').addEventListener('click', function () { enviarPendientes(true); });
     $('ir-carrito').addEventListener('click', function (ev) { ev.preventDefault(); document.querySelector('.carrito').scrollIntoView(); });
@@ -736,7 +805,11 @@
     $('resumen-fecha').value = hoy;
     document.body.dataset.seccion = 'venta';
 
+    // Versiones anteriores guardaban una clave compartida: se borra del dispositivo
+    guardar(CLAVES.config, estado.config);
+
     pintarAvisoConfig();
+    pintarSesion();
     pintarPendientes();
     pintarVenta();
 

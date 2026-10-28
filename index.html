@@ -7,7 +7,38 @@
   <title>Ventas · Soda</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="sin-sesion">
+  <!-- ============ INICIO DE SESIÓN ============ -->
+  <section id="pantalla-login" class="pantalla-login">
+    <form id="form-login" class="login-caja" autocomplete="on">
+      <div class="marca marca-login">Soda <span>· Punto de venta</span></div>
+      <h1 class="titulo">Iniciar sesión</h1>
+      <label class="campo">
+        <span>Usuario</span>
+        <input id="login-usuario" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="30" required>
+      </label>
+      <label class="campo">
+        <span>Contraseña</span>
+        <input id="login-contrasena" name="password" type="password" autocomplete="current-password" maxlength="100" required>
+      </label>
+      <div id="login-mensaje" class="mensaje oculto" role="status" aria-live="polite"></div>
+      <button id="btn-login" class="btn btn-principal btn-ancho" type="submit">Entrar</button>
+
+      <details id="login-conexion" class="login-conexion">
+        <summary>Conexión con Google Sheets</summary>
+        <div id="aviso-config" class="aviso aviso-alerta oculto">
+          Falta la URL de Apps Script. Péguela aquí una sola vez en este dispositivo.
+        </div>
+        <label class="campo">
+          <span>URL de la aplicación web de Apps Script</span>
+          <input id="login-url" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
+        </label>
+        <div id="login-conexion-mensaje" class="mensaje oculto" role="status"></div>
+        <button id="btn-login-conexion" class="btn" type="button">Guardar y probar conexión</button>
+      </details>
+    </form>
+  </section>
+
   <header class="barra">
     <div class="marca">Soda <span>· Punto de venta</span></div>
     <nav class="menu" aria-label="Secciones">
@@ -17,11 +48,11 @@
       <button class="menu-btn" data-seccion="config">Configuración</button>
     </nav>
     <button id="btn-pendientes" class="pendientes oculto" type="button"></button>
+    <div class="sesion-actual">
+      <span id="usuario-actual"></span>
+      <button id="btn-salir" class="btn-salir" type="button">Salir</button>
+    </div>
   </header>
-
-  <div id="aviso-config" class="aviso aviso-alerta oculto">
-    Falta conectar Google Sheets. Vaya a <strong>Configuración</strong> y pegue la URL de Apps Script y la clave de acceso.
-  </div>
 
   <main>
     <!-- ============ 1. REGISTRAR VENTA ============ -->
@@ -131,14 +162,10 @@
 
       <div class="panel">
         <h2 class="subtitulo">Conexión con Google Sheets</h2>
-        <p class="nota">Estos datos se guardan solo en este dispositivo. No se suben a GitHub.</p>
+        <p class="nota">La URL se guarda solo en este dispositivo. Los usuarios y contraseñas se crean en la hoja de cálculo (menú "Sistema de ventas").</p>
         <label class="campo">
           <span>URL de la aplicación web de Apps Script</span>
           <input id="cfg-url" type="url" placeholder="https://script.google.com/macros/s/.../exec" autocomplete="off">
-        </label>
-        <label class="campo">
-          <span>Clave de acceso</span>
-          <input id="cfg-clave" type="password" autocomplete="off">
         </label>
         <div id="conexion-mensaje" class="mensaje oculto" role="status"></div>
         <div class="fila-botones">

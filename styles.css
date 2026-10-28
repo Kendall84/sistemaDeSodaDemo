@@ -190,6 +190,28 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
 .lista-pendientes li.rechazada small { color: var(--error); }
 .lista-pendientes small { color: var(--texto-suave); }
 
+/* ---------- Inicio de sesión ---------- */
+.pantalla-login { display: none; }
+body.sin-sesion > :not(.pantalla-login) { display: none !important; }
+body.sin-sesion .pantalla-login {
+  display: flex; justify-content: center; align-items: flex-start;
+  min-height: 100vh; padding: 48px 16px; background: var(--marca);
+}
+.login-caja {
+  width: min(420px, 100%); background: var(--superficie);
+  border-radius: var(--radio); padding: 24px;
+}
+.marca-login { color: var(--marca); margin-bottom: 12px; }
+.btn-ancho { width: 100%; margin-top: 6px; }
+.login-conexion { margin-top: 18px; border-top: 1px solid var(--borde); padding-top: 12px; }
+.login-conexion summary { cursor: pointer; color: var(--texto-suave); min-height: 32px; }
+.login-conexion .aviso { margin: 10px 0; }
+.sesion-actual { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 15px; }
+.btn-salir {
+  border: 1px solid rgba(255,255,255,.4); background: transparent; color: #fff;
+  border-radius: 8px; padding: 8px 12px; min-height: 40px; cursor: pointer;
+}
+
 /* Barra con el total en teléfonos */
 .barra-total { display: none; }
 
@@ -211,7 +233,9 @@ main { padding: 16px; max-width: 1280px; margin: 0 auto; }
   body { font-size: 16px; }
   .barra { gap: 8px; padding: 8px 10px; }
   .marca span { display: none; }
+  .menu { order: 3; flex-basis: 100%; }
   .menu-btn { padding: 8px 10px; font-size: 15px; }
+  .pendientes { order: 2; padding: 8px 10px; font-size: 14px; }
   main { padding: 12px; }
   .producto { min-height: 110px; padding: 12px; }
   .producto-nombre { font-size: 17px; }
