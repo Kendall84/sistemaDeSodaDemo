@@ -1,0 +1,4 @@
+/* Estilos de la página de pruebas */
+body { font-family: system-ui, sans-serif; margin: 24px; background: #f3f4f1; color: #1d2420; }
+li { padding: 6px 0; } .ok { color: #1e6b3a; } .falla { color: #a3261b; font-weight: 700; }
+#total { font-size: 20px; font-weight: 700; }

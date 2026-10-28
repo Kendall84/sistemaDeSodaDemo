@@ -6,9 +6,8 @@
    duplicados y escribe en las pestañas VENTAS, DETALLE_VENTAS y
    PRODUCTOS.
 
-   La clave de acceso NO va escrita aquí: se guarda en
-   Configuración del proyecto > Propiedades de la secuencia de comandos
-   con el nombre CLAVE_ACCESO (ver instrucciones.txt).
+   Todas las operaciones, salvo "probar" y "login", exigen una sesión
+   válida (ver Usuarios.gs). Aquí no hay contraseñas ni claves escritas.
    ===================================================================== */
 
 var ZONA = 'America/Costa_Rica';
@@ -42,6 +41,7 @@ var CANTIDAD_MAX = 999;
 var LINEAS_MAX = 50;
 var CLIENTE_MAX = 60;
 var NOMBRE_PRODUCTO_MAX = 40;
+var PRODUCTOS_MAX = 60;
 
 /* ------------------------------------------------------------------ */
 /* Puntos de entrada                                                  */
@@ -52,26 +52,40 @@ function doGet() {
   return ContentService.createTextOutput('El servidor del sistema de ventas está activo.');
 }
 
-/** Todas las operaciones llegan por POST con un JSON { accion, clave, ... }. */
+/** Todas las operaciones llegan por POST con un JSON { accion, token, ... }. */
 function doPost(e) {
   var respuesta;
   try {
     var datos = JSON.parse((e && e.postData && e.postData.contents) || '{}');
-    verificarClave(datos.clave);
     prepararHojas();
+    // Acciones que no necesitan sesión
+    if (datos.accion === 'probar') return responder({ ok: true, mensaje: 'Conexión correcta.' });
+    if (datos.accion === 'login') return responder(iniciarSesion(datos.usuario, datos.contrasena));
+    if (datos.accion === 'logout') return responder(cerrarSesion(datos.token));
+
+    var sesion = verificarSesion(datos.token);   // lanza SESION si no es válida
     switch (datos.accion) {
-      case 'probar':           respuesta = { ok: true, mensaje: 'Conexión correcta.' }; break;
+      case 'sesion':           respuesta = { ok: true, usuario: sesion.usuario, rol: sesion.rol }; break;
       case 'obtenerProductos': respuesta = { ok: true, productos: leerProductos() }; break;
-      case 'guardarProductos': respuesta = guardarProductos(datos.productos); break;
+      case 'guardarProductos':
+        if (sesion.rol !== ROL_ADMIN) throw errorCon('PERMISO', 'Solo un usuario ADMIN puede cambiar productos.');
+        respuesta = guardarProductos(datos.productos);
+        break;
       case 'registrarVenta':   respuesta = registrarVenta(datos.venta); break;
       case 'descartarIntento': respuesta = descartarIntento(datos.id); break;
       case 'ventasPorFecha':   respuesta = ventasPorFecha(datos.fecha); break;
       default: throw errorCon('ACCION', 'Acción desconocida.');
     }
   } catch (err) {
-    respuesta = { ok: false, codigo: err.codigo || 'INTERNO', error: err.codigo ? err.message : 'Error interno del servidor: ' + err.message };
+    // No se devuelven detalles internos: solo el mensaje pensado para el usuario
+    if (!err.codigo) console.error(err);
+    respuesta = { ok: false, codigo: err.codigo || 'INTERNO', error: err.codigo ? err.message : 'Error interno del servidor. Intente de nuevo.' };
   }
-  return ContentService.createTextOutput(JSON.stringify(respuesta))
+  return responder(respuesta);
+}
+
+function responder(objeto) {
+  return ContentService.createTextOutput(JSON.stringify(objeto))
     .setMimeType(ContentService.MimeType.JSON);
 }
 
@@ -83,12 +97,6 @@ function errorCon(codigo, mensaje) {
   var e = new Error(mensaje);
   e.codigo = codigo;
   return e;
-}
-
-function verificarClave(clave) {
-  var guardada = PropertiesService.getScriptProperties().getProperty('CLAVE_ACCESO');
-  if (!guardada) throw errorCon('SIN_CLAVE', 'El servidor no tiene CLAVE_ACCESO configurada. Revise instrucciones.txt.');
-  if (typeof clave !== 'string' || clave !== guardada) throw errorCon('CLAVE', 'La clave de acceso no es correcta.');
 }
 
 function esEnteroPositivo(v, max) {
@@ -131,12 +139,13 @@ function prepararHojas() {
       }
     }
   });
+  hojaUsuarios();
 }
 
 /** Función para ejecutar a mano una vez desde el editor (crea las pestañas). */
 function inicializar() {
   prepararHojas();
-  Logger.log('Pestañas listas: VENTAS, DETALLE_VENTAS y PRODUCTOS.');
+  Logger.log('Pestañas listas: VENTAS, DETALLE_VENTAS, PRODUCTOS y USUARIOS. Cree el primer usuario desde el menú Sistema de ventas de la hoja.');
 }
 
 /** Todas las filas de datos (sin encabezado). */
@@ -198,23 +207,59 @@ function leerProductos() {
     });
 }
 
+/**
+ * Actualiza los productos existentes y crea los nuevos.
+ * Un producto nuevo llega sin ID; el servidor le asigna el siguiente
+ * (P006, P007…). No se permiten dos productos con el mismo nombre, así
+ * un reintento por mala conexión no crea el mismo producto dos veces.
+ */
 function guardarProductos(lista) {
   if (!Array.isArray(lista) || lista.length === 0) throw errorCon('VALIDACION', 'No se recibieron productos.');
+  if (lista.length > PRODUCTOS_MAX) throw errorCon('VALIDACION', 'Demasiados productos (máximo ' + PRODUCTOS_MAX + ').');
+  var nombres = {};
   lista.forEach(function (p) {
-    if (!p || typeof p.id !== 'string') throw errorCon('VALIDACION', 'Producto sin identificador.');
+    if (!p || (p.id && typeof p.id !== 'string')) throw errorCon('VALIDACION', 'Producto con identificador inválido.');
     var nombre = String(p.nombre || '').trim();
-    if (!nombre || nombre.length > NOMBRE_PRODUCTO_MAX) throw errorCon('VALIDACION', 'El nombre del producto ' + p.id + ' no es válido.');
+    if (!nombre || nombre.length > NOMBRE_PRODUCTO_MAX) throw errorCon('VALIDACION', 'Hay un producto con nombre vacío o demasiado largo.');
     if (!esEnteroPositivo(p.precio, PRECIO_MAX)) throw errorCon('VALIDACION', 'El precio de ' + nombre + ' no es válido.');
+    var clave = nombre.toLowerCase();
+    if (nombres[clave]) throw errorCon('VALIDACION', 'Hay dos productos llamados "' + nombre + '".');
+    nombres[clave] = true;
   });
   return conBloqueo(function () {
     var h = hoja(HOJA_PRODUCTOS);
-    lista.forEach(function (p) {
+    var actuales = leerProductos();
+    var nuevos = lista.filter(function (p) { return !p.id; });
+    // Nombres que quedarán en la hoja (con los cambios de esta misma lista)
+    var cambios = {};
+    lista.forEach(function (p) { if (p.id) cambios[p.id] = String(p.nombre).trim(); });
+    var existentes = actuales.map(function (a) { return (cambios[a.id] || a.nombre).trim().toLowerCase(); });
+    nuevos.forEach(function (p) {
+      var repetido = existentes.indexOf(String(p.nombre).trim().toLowerCase()) !== -1;
+      if (repetido) throw errorCon('VALIDACION', 'Ya existe un producto llamado "' + String(p.nombre).trim() + '".');
+    });
+    if (actuales.length + nuevos.length > PRODUCTOS_MAX) throw errorCon('VALIDACION', 'Demasiados productos (máximo ' + PRODUCTOS_MAX + ').');
+
+    lista.filter(function (p) { return p.id; }).forEach(function (p) {
       var fila = buscarFila(h, p.id);
       if (!fila) throw errorCon('VALIDACION', 'El producto ' + p.id + ' no existe en la pestaña PRODUCTOS.');
       h.getRange(fila, 2, 1, 3).setValues([[textoSeguro(p.nombre, NOMBRE_PRODUCTO_MAX), p.precio, p.activo === false ? 'INACTIVO' : 'ACTIVO']]);
     });
+
+    var siguiente = actuales.reduce(function (max, a) {
+      var m = /^P(\d+)$/.exec(a.id);
+      return m ? Math.max(max, parseInt(m[1], 10)) : max;
+    }, 0) + 1;
+    if (nuevos.length) {
+      var filasNuevas = nuevos.map(function (p) {
+        var id = 'P' + ('00' + siguiente++).slice(-3);
+        return [id, textoSeguro(p.nombre, NOMBRE_PRODUCTO_MAX), p.precio, p.activo === false ? 'INACTIVO' : 'ACTIVO'];
+      });
+      h.getRange(h.getLastRow() + 1, 1, filasNuevas.length, 4).setValues(filasNuevas);
+    }
+    propiedades().setProperty('PRODUCTOS_CAMBIO', String(Date.now()));
     SpreadsheetApp.flush();
-    return { ok: true, productos: leerProductos() };
+    return { ok: true, productos: leerProductos(), creados: nuevos.length };
   });
 }
 
@@ -237,7 +282,12 @@ function validarVenta(v) {
   if (v.items.length > LINEAS_MAX) throw errorCon('VALIDACION', 'La venta tiene demasiados productos distintos.');
 
   var existentes = {};
-  leerProductos().forEach(function (p) { existentes[p.id] = true; });
+  leerProductos().forEach(function (p) { existentes[p.id] = p; });
+  // Una venta hecha después del último cambio de productos debe usar el precio
+  // actual de PRODUCTOS. Una más vieja (pendiente por falta de Internet) conserva
+  // el precio con que se cobró.
+  var ultimoCambio = Number(propiedades().getProperty('PRODUCTOS_CAMBIO')) || 0;
+  var exigirPrecioActual = momento.getTime() >= ultimoCambio;
 
   var vistos = {};
   var total = 0;
@@ -250,6 +300,9 @@ function validarVenta(v) {
     if (!nombre) throw errorCon('VALIDACION', 'Producto sin nombre.');
     if (!esEnteroPositivo(it.precio, PRECIO_MAX)) throw errorCon('VALIDACION', 'Precio inválido para ' + nombre + '.');
     if (!esEnteroPositivo(it.cantidad, CANTIDAD_MAX)) throw errorCon('VALIDACION', 'Cantidad inválida para ' + nombre + '.');
+    if (exigirPrecioActual && it.precio !== existentes[it.productoId].precio) {
+      throw errorCon('PRECIO', 'El precio de ' + nombre + ' cambió. Se actualizó el carrito; revise el total y registre de nuevo.');
+    }
     var subtotal = it.precio * it.cantidad;
     total += subtotal;
     unidades += it.cantidad;

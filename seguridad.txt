@@ -1,0 +1,222 @@
+==================================================================
+ REVISIÓN DE SEGURIDAD — SISTEMA DE VENTAS (checklist de 20 puntos)
+==================================================================
+
+Tipo de proyecto: sistema con usuarios, inicio de sesión y datos del
+negocio (ventas y precios). NO es una página que solo muestra
+información, por eso se revisaron los 20 puntos completos.
+
+Arquitectura (para entender las respuestas):
+  Tablet → página estática en Cloudflare Pages → Google Apps Script
+  (el "servidor") → Google Sheets (los datos). No hay base de datos
+  tradicional, ni servidor propio, ni pagos, ni subida de archivos.
+
+Marcas:
+  [APLICADO]       quedó implementado en esta versión.
+  [NO APLICA]      no existe esa parte en el sistema; se explica por qué.
+  [PARCIAL]        aplicado en la medida que permite la plataforma;
+                   se explica qué falta.
+  [PENDIENTE]      depende de un paso suyo o queda para más adelante.
+
+
+------------------------------------------------------------------
+ SECRETOS Y BASE DE DATOS
+------------------------------------------------------------------
+
+1) Ocultar API keys .......................................... [APLICADO]
+   La página no tiene ninguna clave, token ni contraseña escrita. La
+   URL de Apps Script no es secreta: sin un usuario y contraseña
+   válidos el servidor no muestra ni guarda nada. La antigua
+   CLAVE_ACCESO compartida se eliminó; la página la borra sola del
+   dispositivo.
+
+2) Eliminar secretos de Git .................................. [APLICADO]
+   Se revisó el historial completo del repositorio sistemaDeSodaDemo
+   (todos los commits): no hay claves, contraseñas ni tokens. No hace
+   falta .gitignore porque el proyecto no usa archivos de secretos.
+   Regla para siempre: nunca suba contraseñas ni capturas donde se
+   vean.
+
+3) Key pública para la DB ................................... [NO APLICA]
+   No hay base de datos con claves (como Supabase o Firebase). La
+   página nunca habla con Google Sheets directamente: solo Apps
+   Script, que corre con SU cuenta ("Ejecutar como: Yo"), toca la
+   hoja. El equivalente se cumple: el cliente no tiene ninguna
+   credencial de la hoja.
+
+4) Row-Level Security ....................................... [NO APLICA]
+   Google Sheets no tiene RLS. El equivalente: la hoja es privada (no
+   la comparta) y todo acceso pasa por Apps Script, que revisa la
+   sesión y el rol en cada operación (ver puntos 6 y 7).
+
+5) Encriptar datos sensibles ................................. [PARCIAL]
+   - Contraseñas: nunca se guardan; solo su huella (punto 10).
+   - Tokens de sesión: el servidor guarda solo su huella SHA-256; si
+     alguien viera las propiedades del script, no podría usarlos.
+   - Ventas: no son datos sensibles (no hay tarjetas, cédulas ni
+     teléfonos; el nombre del cliente es opcional). Google cifra sus
+     hojas en reposo y en tránsito. No se agregó cifrado propio porque
+     impediría ver y sumar los datos en la hoja.
+   Recomendación: no escriba datos personales en "Nombre del cliente".
+
+
+------------------------------------------------------------------
+ AUTENTICACIÓN Y ACCESO
+------------------------------------------------------------------
+
+6) Forzar autenticación ...................................... [APLICADO]
+   - Toda acción del servidor, salvo "probar" (que no devuelve datos)
+     y "login", exige un token de sesión válido. Esto se comprueba EN
+     EL SERVIDOR; ocultar pantallas en la página es solo comodidad.
+   - La página muestra únicamente la pantalla de inicio de sesión
+     hasta entrar.
+   - La sesión dura 12 horas desde el último uso. Se invalida al
+     tocar "Salir", al cambiar la contraseña, al poner el usuario
+     INACTIVO o con "Cerrar todas las sesiones".
+
+7) Restringir acceso a registros ............................. [APLICADO]
+   - Roles: ADMIN (vende, consulta y cambia productos) y CAJERO (solo
+     vende y consulta). El servidor rechaza guardarProductos si el rol
+     no es ADMIN, aunque alguien modifique la página.
+   - Nadie puede editar ni borrar ventas desde la página.
+   - Todos los usuarios ven el historial y el resumen del negocio:
+     es lo que necesita una soda. Si más adelante quiere que un cajero
+     vea solo sus propias ventas, hay que agregar la columna
+     "Registrado por" en VENTAS (cambio pequeño, no incluido).
+
+8) Bloquear manipulación de campos ........................... [APLICADO]
+   - El usuario y el rol salen de la sesión guardada en el servidor,
+     nunca de lo que envía la página.
+   - El servidor recalcula subtotales, total y unidades, y exige el
+     precio actual de PRODUCTOS. Una venta con un precio inventado se
+     rechaza. Única excepción, a propósito: una venta hecha ANTES del
+     último cambio de precios (pendiente por falta de Internet)
+     conserva el precio con que se cobró.
+   - El ID de cada producto nuevo lo asigna el servidor.
+   Riesgo que queda: la fecha y hora de la venta las pone la tablet
+   (necesario para las ventas pendientes). Se rechazan si están más de
+   10 minutos en el futuro o tienen más de 30 días.
+
+9) Proteger session cookies ................................. [NO APLICA]
+   No se usan cookies: Apps Script no permite crear cookies HttpOnly
+   para otro dominio. La sesión es un token aleatorio de 512 bits que
+   la página envía en cada petición. Se guarda en el almacenamiento
+   del navegador de ese dispositivo; el riesgo de este método es el
+   XSS, y por eso se reforzaron los puntos 15 y 18.
+
+10) Hashear contraseñas ...................................... [APLICADO]
+   PBKDF2-HMAC-SHA256 con 2000 repeticiones y una sal aleatoria
+   distinta para cada usuario; la comparación no se corta en la
+   primera diferencia. Nota honesta: bcrypt y argon2 no existen en
+   Google Apps Script; PBKDF2 es el estándar reconocido que sí se
+   puede usar ahí. Las 2000 repeticiones son pocas para PBKDF2 porque
+   Apps Script es lento; el bloqueo por intentos (punto 11) compensa.
+   Si el "Entrar" resulta rápido en su cuenta, se puede subir
+   ITERACIONES_HASH en Usuarios.gs (los usuarios tendrían que volver a
+   crear su contraseña).
+
+
+------------------------------------------------------------------
+ ABUSO Y ENTRADAS
+------------------------------------------------------------------
+
+11) Rate limiting ............................................ [APLICADO]
+   - 5 contraseñas incorrectas seguidas bloquean ese usuario 15
+     minutos (menú "Desbloquear usuario" para quitarlo antes).
+   - Más de 30 intentos fallidos en 10 minutos, sumando todos los
+     usuarios, bloquean todos los inicios de sesión 10 minutos.
+   - El mensaje es el mismo exista o no el usuario.
+   Límite de la plataforma: Apps Script no entrega la dirección IP de
+   quien llama, así que no se puede limitar por IP. Las demás acciones
+   exigen sesión, así que un desconocido no puede abusar de ellas.
+
+12) Protección contra bots .................................. [NO APLICA]
+   Es un sistema interno: solo lo usan el dueño y sus empleados, con
+   usuarios creados a mano (no hay registro público ni formulario
+   abierto). Los puntos 6 y 11 ya frenan los intentos automáticos.
+   Se podría agregar Cloudflare Turnstile en el inicio de sesión,
+   pero exige guardar una clave secreta en Apps Script y más pasos de
+   configuración; no compensa para esta versión.
+
+13) Parametrizar queries .................................... [NO APLICA]
+   No hay SQL. El equivalente en Sheets se aplicó: los datos se
+   escriben como valores (nunca como fórmulas) y cualquier texto que
+   empiece con =, +, - o @ se guarda como texto, para que nadie pueda
+   inyectar una fórmula en la hoja.
+
+14) Validar inputs ........................................... [APLICADO]
+   En la página y otra vez en el servidor: cantidades y precios
+   enteros positivos con máximo, total recalculado, productos
+   existentes y sin repetir, ID de venta con formato fijo, fechas
+   razonables, largo máximo de nombres, usuario con letras/números
+   y contraseña de al menos 8 caracteres.
+
+15) Sanitizar contenido (XSS) ................................ [APLICADO]
+   Todo lo que viene de la hoja o del usuario se muestra con
+   textContent, nunca con innerHTML, así que un nombre como
+   <script> se ve como texto y no se ejecuta. Además la política CSP
+   del punto 18 bloquea scripts que no sean de la propia página.
+
+16) Restringir archivos ..................................... [NO APLICA]
+   El sistema no permite subir archivos. La exportación a Excel se
+   genera en el propio navegador y solo se descarga.
+
+
+------------------------------------------------------------------
+ RESPUESTAS E INFRAESTRUCTURA
+------------------------------------------------------------------
+
+17) Devolver solo datos necesarios ........................... [APLICADO]
+   - El inicio de sesión devuelve solo token, usuario y rol (nunca la
+     huella ni la sal).
+   - El historial devuelve solo las ventas CONFIRMADAS del día pedido.
+   - Los errores internos ya no muestran detalles técnicos al
+     navegador; quedan en el registro de Apps Script (Ejecuciones).
+
+18) Security headers ......................................... [APLICADO]
+   Archivo _headers (Cloudflare Pages lo aplica solo):
+   Content-Security-Policy (solo scripts y estilos propios; solo se
+   conecta con Google Apps Script; no se puede incrustar en otra
+   página), X-Frame-Options DENY, X-Content-Type-Options nosniff,
+   Referrer-Policy no-referrer, Permissions-Policy (sin cámara,
+   micrófono ni ubicación) y Cross-Origin-Opener-Policy.
+   Para poder usar una CSP estricta, la librería de Excel ahora es una
+   copia local (vendor/) en lugar de venir de otro sitio, y la página
+   de pruebas usa su propio archivo CSS.
+   [PENDIENTE] Comprobar en su sitio publicado que aparecen
+   (instrucciones.txt, parte 18, paso 8).
+
+19) Forzar HTTPS ............................................. [APLICADO]
+   Cloudflare Pages (*.pages.dev) solo sirve por HTTPS y redirige
+   HTTP. Se agregó HSTS (Strict-Transport-Security, 1 año) en
+   _headers. Google Apps Script también es solo HTTPS, y la página
+   rechaza cualquier URL de servidor que no sea
+   https://script.google.com/...
+   Si algún día usa un dominio propio: en Cloudflare active
+   "Always Use HTTPS" (SSL/TLS > Edge Certificates).
+
+20) Escanear dependencias ..................................... [PARCIAL]
+   La única dependencia es SheetJS 0.18.5 (exportar a Excel), copiada
+   del paquete oficial de npm. "npm audit" reporta dos fallas
+   conocidas de esa versión (CVE-2023-30533 y CVE-2024-22363), pero
+   ambas afectan solo al LEER archivos de Excel de terceros; este
+   sistema solo CREA archivos, así que no le afectan. SheetJS dejó de
+   publicar versiones nuevas en npm; si más adelante se quiere quitar
+   ese aviso, se puede cambiar por la versión 0.20.x de su sitio
+   oficial.
+   [PENDIENTE] Activar Dependabot no sirve aquí (no hay package.json).
+   Recomendación: revisar esta librería una vez al año.
+
+
+------------------------------------------------------------------
+ RESUMEN
+------------------------------------------------------------------
+  Aplicados:   1, 2, 6, 7, 8, 10, 11, 14, 15, 17, 18, 19
+  Parciales:   5, 20
+  No aplican:  3, 4, 9, 12, 13, 16  (cada uno explicado arriba)
+
+  Pendientes de usted:
+   - Crear los usuarios (instrucciones.txt, parte 3, paso 8).
+   - Borrar la vieja CLAVE_ACCESO (parte 18, paso 5).
+   - Comprobar los encabezados en el sitio publicado (parte 18, paso 8).
+   - No compartir la hoja de cálculo con nadie que no deba verla.

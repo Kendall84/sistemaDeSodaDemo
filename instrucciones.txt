@@ -10,6 +10,9 @@ En cada parte verá dos marcas:
   [YA ESTÁ HECHO]  = ya quedó programado, usted no tiene que hacer nada.
   [USTED HACE]     = paso que usted debe realizar con su cuenta.
 
+¿YA TENÍA FUNCIONANDO LA VERSIÓN ANTERIOR (sin inicio de sesión)?
+Vaya directo a la parte 18. Ahí están solo los pasos para actualizar.
+
 IMPORTANTE: el sistema todavía NO está conectado a ninguna hoja de
 cálculo. La conexión empieza a funcionar cuando usted complete las
 partes 2, 3, 4 y 5. Hasta entonces, la página avisa "Falta conectar
@@ -32,12 +35,22 @@ sistema-ventas/
                       resumen, configuración y exportar a Excel.
   sw.js               Permite volver a abrir la página aunque falle
                       Internet (si ya se había abierto antes).
+  _headers            Encabezados de seguridad que Cloudflare Pages
+                      agrega a la página (no lo borre ni lo renombre).
   instrucciones.txt   Este documento.
+  seguridad.txt       Revisión de los 20 puntos de seguridad.
+
+  vendor/
+    xlsx.full.min.js  Librería SheetJS 0.18.5 para crear el archivo de
+    xlsx-LICENSE.txt  Excel (copia local, con su licencia).
 
   apps-script/
     Codigo.gs         El "servidor". Se copia dentro de Google Sheets
                       (Extensiones > Apps Script). Valida las ventas,
                       evita duplicados y escribe en las pestañas.
+    Usuarios.gs       Inicio de sesión: usuarios, contraseñas (guardadas
+                      como huella, nunca en texto), bloqueo por intentos
+                      fallidos y sesiones. Va junto a Codigo.gs.
     appsscript.json   Configuración opcional de Apps Script (zona
                       horaria de Costa Rica). Ver la parte 3, paso 6.
 
@@ -45,8 +58,8 @@ sistema-ventas/
     pruebas.html      Abra este archivo en el navegador para ver las
     pruebas.js        pruebas de cálculos (deben salir todas en verde).
 
-Nada de esto contiene contraseñas ni claves. La clave de acceso se
-escribe solo en Apps Script y en la tablet (ver parte 3).
+Nada de esto contiene contraseñas ni claves. Los usuarios y sus
+contraseñas se crean dentro de la hoja de cálculo (parte 3, paso 8).
 
 
 ==================================================================
@@ -58,7 +71,7 @@ escribe solo en Apps Script y en la tablet (ver parte 3).
 3. Arriba a la izquierda cambie el nombre "Hoja de cálculo sin título"
    por, por ejemplo: Ventas Soda.
 4. No necesita crear las pestañas a mano. [YA ESTÁ HECHO] El código
-   crea automáticamente estas tres pestañas con sus columnas:
+   crea automáticamente estas cuatro pestañas con sus columnas:
 
    VENTAS:          ID de venta | Fecha | Hora | Nombre del cliente |
                     Cantidad total de unidades | Total de la venta |
@@ -67,6 +80,9 @@ escribe solo en Apps Script y en la tablet (ver parte 3).
                     Precio unitario | Cantidad | Subtotal
    PRODUCTOS:       ID del producto | Nombre | Precio | Estado
                     (con los 5 productos y precios de prueba)
+   USUARIOS:        Usuario | Rol | Estado | Huella de contraseña |
+                    Sal | Intentos fallidos | Bloqueado hasta
+                    (las contraseñas NO aparecen; solo su huella)
 
    La pestaña "Hoja 1" que trae Google puede quedarse o borrarse.
 
@@ -94,19 +110,13 @@ el código los usa para encontrar los datos.
 4. Toque el ícono de guardar (disquete) o Ctrl+S.
    Arriba puede ponerle nombre al proyecto, por ejemplo: Servidor Ventas.
 
-5. CREAR LA CLAVE DE ACCESO (muy importante):
-   a. A la izquierda toque el engranaje "Configuración del proyecto".
-   b. Baje hasta "Propiedades de la secuencia de comandos" y toque
-      "Agregar propiedad de la secuencia de comandos".
-   c. En "Propiedad" escriba exactamente:   CLAVE_ACCESO
-   d. En "Valor" invente una clave larga, por ejemplo cuatro palabras
-      y números:  mango-tortilla-cafe-2026-azul
-      (No use esta de ejemplo. Invente la suya.)
-   e. Toque "Guardar propiedades de la secuencia de comandos".
-   f. Anote la clave en un lugar seguro. La va a escribir en la tablet.
-
-   Esta clave NO se escribe en ningún archivo del proyecto ni se sube
-   a GitHub. Solo existe en Apps Script y en la tablet.
+5. Agregar el segundo archivo (Usuarios.gs):
+   a. A la izquierda, junto a "Archivos", toque "+" > "Secuencia de
+      comandos" (Script).
+   b. Escriba el nombre:  Usuarios   (Apps Script le agrega el .gs).
+   c. Borre lo que trae, pegue TODO el contenido de
+      apps-script/Usuarios.gs y guarde (Ctrl+S).
+   Debe quedar con dos archivos: Código.gs y Usuarios.gs.
 
 6. Zona horaria: en la misma pantalla de Configuración del proyecto,
    en "Zona horaria", elija (GMT-06:00) Costa Rica. (El código ya usa
@@ -122,7 +132,39 @@ el código los usa para encontrar los datos.
       seguro)". Es normal: la "aplicación" es su propio código, que
       solo usted usa. Luego toque "Permitir".
    f. Vuelva a la hoja de cálculo: deben aparecer las pestañas VENTAS,
-      DETALLE_VENTAS y PRODUCTOS (esta última con los 5 productos).
+      DETALLE_VENTAS, PRODUCTOS (con los 5 productos) y USUARIOS.
+
+8. CREAR LOS USUARIOS (muy importante):
+   a. En la hoja de cálculo, recargue la página (F5). Arriba, junto a
+      "Ayuda", aparece el menú "Sistema de ventas".
+      (Si no aparece, espere unos segundos y recargue de nuevo.)
+   b. Toque "Sistema de ventas" > "Crear usuario o cambiar contraseña".
+      La primera vez Google puede pedir permisos otra vez: acéptelos.
+   c. Escriba el usuario (minúsculas, sin espacios ni tildes), por
+      ejemplo:  kendall
+   d. Escriba una contraseña de al menos 8 caracteres. Use una frase
+      fácil de recordar y difícil de adivinar, por ejemplo cuatro
+      palabras: "tortilla azul llueve martes" (no use esta de ejemplo).
+      La ventanita la muestra mientras la escribe: que nadie mire.
+   e. Escriba el rol:
+        ADMIN   = vende, consulta y cambia productos y precios.
+        CAJERO  = solo vende y consulta historial y resumen.
+      Cree al menos un ADMIN (usted).
+   f. Repita para cada persona que vaya a usar la tablet. Lo ideal es
+      un usuario por persona, así se sabe quién usó el sistema.
+
+   Otras opciones del mismo menú:
+   - "Crear usuario o cambiar contraseña" con un usuario que ya existe
+     le pone la contraseña nueva y cierra sus sesiones abiertas.
+   - "Desbloquear usuario": tras 5 contraseñas incorrectas el usuario
+     queda bloqueado 15 minutos; esto lo desbloquea antes.
+   - "Cerrar todas las sesiones": obliga a todos a entrar de nuevo
+     (úselo si pierde la tablet).
+   - Para quitarle el acceso a alguien: en la pestaña USUARIOS cambie
+     su "Estado" de ACTIVO a INACTIVO. Sale de inmediato.
+
+   Nunca escriba contraseñas en la hoja, en GitHub ni en el código.
+   No edite las columnas "Huella de contraseña" ni "Sal".
 
 
 ==================================================================
@@ -151,16 +193,16 @@ el código los usa para encontrar los datos.
    aplicación web debe aceptar visitas sin cuenta. Esto NO hace pública
    la hoja de cálculo:
    - La hoja sigue siendo privada (solo su cuenta la puede abrir).
-   - Cada operación (registrar, consultar, cambiar precios) exige la
-     CLAVE_ACCESO. Sin la clave, el servidor responde "La clave de
-     acceso no es correcta" y no muestra ni guarda nada.
+   - Cada operación (registrar, consultar, cambiar precios) exige
+     haber iniciado sesión con usuario y contraseña. Sin sesión, el
+     servidor no muestra ni guarda nada.
+   - Cambiar productos y precios exige además el rol ADMIN.
    - "Ejecutar como: Yo" significa que el código escribe en SU hoja
      con SUS permisos, sin que la tablet tenga acceso a su cuenta.
-   Riesgo que queda: quien conozca la URL y la clave podría registrar
-   o consultar ventas. Por eso use una clave larga y no la comparta.
-   Si pierde la tablet o sospecha que alguien la conoce, cambie el
-   valor de CLAVE_ACCESO (parte 3, paso 5) y escriba la nueva en la
-   tablet. No hace falta volver a implementar.
+   Riesgo que queda: quien conozca un usuario y su contraseña podría
+   registrar o consultar ventas. Por eso cada persona tiene su propia
+   contraseña. Si pierde la tablet: menú "Sistema de ventas" >
+   "Cerrar todas las sesiones".
 
 COMUNICACIÓN DESDE CLOUDFLARE PAGES (CORS)   [YA ESTÁ HECHO]
    Apps Script no permite configurar permisos entre dominios (CORS) de
@@ -171,7 +213,7 @@ COMUNICACIÓN DESDE CLOUDFLARE PAGES (CORS)   [YA ESTÁ HECHO]
    servidor, no con su cuenta real de Google; la prueba real es la
    parte 9.
 
-SI MÁS ADELANTE CAMBIA EL CÓDIGO DE Codigo.gs:
+SI MÁS ADELANTE CAMBIA EL CÓDIGO DE Codigo.gs O Usuarios.gs:
    Pegue el código nuevo, guarde, y luego vaya a
    Implementar > Gestionar implementaciones > lápiz (editar) >
    Versión: "Nueva versión" > Implementar.
@@ -184,14 +226,12 @@ SI MÁS ADELANTE CAMBIA EL CÓDIGO DE Codigo.gs:
 ==================================================================
 
 La URL que copió en la parte 4 (la que termina en /exec).
-Se escribe en la página, sección Configuración > "Conexión con Google
-Sheets", junto con la clave. Lo hará en la parte 8, ya con la página
-publicada.
+Se escribe en la pantalla de inicio de sesión, en "Conexión con
+Google Sheets". Lo hará en la parte 8, ya con la página publicada.
 
-La URL y la clave se guardan SOLO en el navegador de ese dispositivo.
-No se escriben en los archivos ni se suben a GitHub. Si usa la
-página en otro dispositivo (por ejemplo su computadora), debe
-escribirlas también ahí.
+La URL se guarda SOLO en el navegador de ese dispositivo. No se
+escribe en los archivos ni se sube a GitHub. Si usa la página en otro
+dispositivo (por ejemplo su computadora), debe escribirla también ahí.
 
 
 ==================================================================
@@ -209,16 +249,19 @@ escribirlas también ahí.
    "uploading an existing file".
 6. Descomprima el .zip en su computadora. Abra la carpeta
    sistema-ventas y arrastre TODO SU CONTENIDO (index.html,
-   styles.css, script.js, logica.js, sw.js, instrucciones.txt y las
-   carpetas apps-script y pruebas) a la ventana de GitHub.
+   styles.css, script.js, logica.js, sw.js, _headers,
+   instrucciones.txt, seguridad.txt y las carpetas apps-script,
+   pruebas y vendor) a la ventana de GitHub.
+   Ojo: _headers empieza con guion bajo y no tiene extensión. Algunas
+   computadoras lo ocultan; revise en GitHub que quedó subido.
    Importante: arrastre lo que está DENTRO de la carpeta, no la
    carpeta sistema-ventas completa, para que index.html quede en la
    raíz del repositorio.
 7. Abajo escriba un mensaje como "Primera versión" y toque
    "Commit changes".
 
-Nunca suba a GitHub la clave de acceso ni capturas de pantalla donde
-aparezca.
+Nunca suba a GitHub contraseñas ni capturas de pantalla donde
+aparezcan.
 
 
 ==================================================================
@@ -260,11 +303,14 @@ para probar, pero la conexión con GitHub es mejor para actualizar.
 3. Para que quede como una aplicación:
      Android/Chrome: menú ⋮ > "Agregar a la pantalla principal".
      iPad/Safari:    botón Compartir > "Agregar a inicio".
-4. Toque "Configuración".
-5. En "Conexión con Google Sheets" pegue la URL de la parte 4 y la
-   clave de la parte 3. Toque "Guardar y probar conexión".
-6. Debe aparecer:  ✔ Conexión correcta con Google Sheets.
-   Si aparece un error, lea la sección 16 (Problemas comunes).
+4. Aparece la pantalla "Iniciar sesión". Toque "Conexión con Google
+   Sheets", pegue la URL de la parte 4 y toque "Guardar y probar
+   conexión". Debe aparecer:  ✔ Conexión correcta con Google Sheets.
+   (Esto se hace una sola vez en cada dispositivo.)
+5. Escriba su usuario y contraseña (parte 3, paso 8) y toque "Entrar".
+6. Arriba a la derecha verá su usuario y el botón "Salir".
+   La sesión dura 12 horas desde el último uso; después pide la
+   contraseña otra vez. Si aparece un error, lea la sección 16.
 7. En la tablet, revise que la fecha y la hora estén correctas
    (Ajustes > Fecha y hora > automática). Las ventas usan la hora de
    la tablet.
@@ -342,10 +388,32 @@ clic derecho > Eliminar filas). La página no permite borrar ventas.
 el precio que tenía en el momento de venderse (columna Precio
 unitario en DETALLE_VENTAS).
 
+AGREGAR UN PRODUCTO NUEVO   [USTED HACE]
+1. En "Configuración" > "Productos y precios" toque
+   "+ Agregar producto". Aparece una fila nueva (en verde).
+2. Escriba el nombre y el precio. Deje marcado "Activo".
+   Si se equivocó, toque "Quitar" en esa fila (solo antes de guardar).
+3. Toque "Guardar productos". Debe aparecer:
+     ✔ Productos guardados en Google Sheets. Se agregó 1 producto(s)...
+4. [YA ESTÁ HECHO] El servidor le asigna el siguiente ID (P006, P007…),
+   lo escribe en la pestaña PRODUCTOS y el botón aparece en
+   "Registrar venta".
+   - No se permiten dos productos con el mismo nombre.
+   - Un producto no se puede borrar desde la página (para no perder el
+     historial). Si ya no lo vende, desmarque "Activo" y guarde.
+
+IMPORTANTE la primera vez: el botón "Agregar producto" necesita la
+versión nueva de Codigo.gs. Si la página dice "hay que actualizar
+Codigo.gs", haga esto una sola vez:
+   a. Abra la hoja > Extensiones > Apps Script.
+   b. Borre el contenido de Código.gs y pegue el apps-script/Codigo.gs
+      nuevo. Guarde (Ctrl+S).
+   c. Implementar > Gestionar implementaciones > lápiz (editar) >
+      Versión: "Nueva versión" > Implementar.
+   La URL sigue siendo la misma; no cambie nada en la tablet.
+
 También puede cambiar precios directamente en la pestaña PRODUCTOS;
-la página los toma al abrirse. Para agregar un producto nuevo más
-adelante, agregue una fila en PRODUCTOS con un ID nuevo (P006, P007…),
-nombre, precio y ACTIVO, y recargue la página.
+la página los toma al abrirse.
 
 Nota: si cambia el NOMBRE de un producto a mitad del día, el resumen
 de ese día lo mostrará en dos filas (nombre viejo y nombre nuevo).
@@ -384,7 +452,9 @@ Google Sheets guarda en la nube, pero conviene tener copias:
 3. Si alguien borra algo por error: Archivo > Historial de versiones >
    Ver historial de versiones, y restaure una versión anterior.
 4. El código queda respaldado en GitHub. Guarde también el .zip.
-5. Anote la CLAVE_ACCESO en un lugar seguro fuera de la tablet.
+5. Guarde su contraseña de ADMIN en un lugar seguro fuera de la
+   tablet. Si la olvida, puede ponerle una nueva desde el menú
+   "Sistema de ventas" de la hoja.
 
 
 ==================================================================
@@ -407,7 +477,7 @@ Google Sheets guarda en la nube, pero conviene tener copias:
       Si no llegó, la anula para siempre y le deja editar el carrito.
       Si sí llegó, se lo dice. Necesita Internet.
 - Si el servidor responde que la venta es inválida (por ejemplo, la
-  clave no es correcta), el mensaje es rojo: "La venta NO se guardó"
+  sesión venció o un precio cambió), el mensaje es rojo: "La venta NO se guardó"
   y el carrito queda libre para corregir.
 - Las ventas pendientes se reintentan solas cuando vuelve Internet,
   al abrir la página y cada minuto. También puede tocar el aviso
@@ -444,8 +514,11 @@ RIESGOS QUE NO SE PUEDEN ELIMINAR (y cómo se manejan)
 - Google tiene límites de uso diarios para cuentas gratuitas; una
   soda pequeña no debería llegar a ellos, pero si ocurre, las ventas
   quedan pendientes y se envían después.
-- Quien tenga la URL y la clave puede registrar ventas. → Clave larga
-  y cambiarla si hace falta.
+- Quien tenga un usuario y su contraseña puede registrar ventas. →
+  Una contraseña por persona, bloqueo tras 5 intentos y la opción de
+  cerrar todas las sesiones.
+- Si la sesión vence mientras no hay Internet, las ventas pendientes
+  se quedan en la tablet y se envían cuando alguien vuelva a entrar.
 
 
 ==================================================================
@@ -487,12 +560,26 @@ PRUEBA EN SU HOJA REAL:
  16. PROBLEMAS COMUNES
 ==================================================================
 
-"La clave de acceso no es correcta"
-   → La clave de la tablet no coincide con CLAVE_ACCESO. Revise
-     mayúsculas, espacios al inicio o al final.
+"Usuario o contraseña incorrectos"
+   → Revise mayúsculas de la contraseña y que el usuario esté bien
+     escrito. Tras 5 intentos el usuario se bloquea 15 minutos (o use
+     "Desbloquear usuario" en el menú de la hoja).
 
-"El servidor no tiene CLAVE_ACCESO configurada"
-   → Falta la parte 3, paso 5.
+"La sesión venció o no es válida"
+   → Entre otra vez. Pasa después de 12 horas sin uso, si se cambió
+     la contraseña, si el usuario quedó INACTIVO o si se usó "Cerrar
+     todas las sesiones".
+
+"Solo un usuario ADMIN puede cambiar productos"
+   → Entre con un usuario ADMIN.
+
+"El precio de ... cambió"
+   → Alguien cambió precios desde otro dispositivo. La página ya
+     actualizó el carrito: revise el total y registre de nuevo.
+
+No aparece el menú "Sistema de ventas" en la hoja
+   → Revise que Usuarios.gs esté guardado en Apps Script y recargue
+     la hoja.
 
 "No hubo respuesta del servidor" o "respondió algo inesperado"
    → Revise que haya Internet.
@@ -521,16 +608,22 @@ Se ejecutaron estas pruebas antes de entregar (con resultados
 correctos):
 
   A. Cálculos y validaciones (pruebas/pruebas.html): 11 de 11.
-  B. Codigo.gs ejecutado con una SIMULACIÓN de Google Sheets en la
-     computadora del desarrollador: 16 de 16 (clave, creación de
+  B. Codigo.gs + Usuarios.gs ejecutados con una SIMULACIÓN de Google
+     Sheets en la computadora del desarrollador: 26 de 26 (creación de
      pestañas, 1 fila en VENTAS + 3 en DETALLE_VENTAS, reintentos sin
      duplicar, guardado a medias, validación en servidor, cambio de
-     precio, resumen, bloqueo ocupado).
+     precio, agregar producto, resumen, bloqueo ocupado, inicio de
+     sesión, huella de contraseña, bloqueo tras 5 intentos, límite
+     global de intentos, vencimiento y cierre de sesión, permisos de
+     ADMIN y CAJERO, precio manipulado rechazado).
   C. La página real en un navegador Chrome automatizado, conectada a
-     esa simulación: 19 de 19 (total ₡2.300 y ₡5.600, venta vacía,
-     doble toque, corte de conexión, respuesta perdida sin duplicar,
-     recarga durante el envío, pendientes, cambio de precio,
-     historial, resumen, exportación, teléfono sin desbordes).
+     esa simulación y con los encabezados de seguridad de _headers
+     activos: 22 de 22 (inicio de sesión, total ₡2.300 y ₡5.600, venta
+     vacía, doble toque, corte de conexión, respuesta perdida sin
+     duplicar, recarga durante el envío, pendientes, sesión vencida
+     sin perder el carrito ni las pendientes, cajero sin
+     Configuración, cambio de precio, agregar producto, historial,
+     resumen, exportación, teléfono sin desbordes).
   D. El archivo .xlsx exportado se abrió con un lector de Excel y sus
      totales coincidieron con la hoja simulada.
 
@@ -562,9 +655,60 @@ Google y SU sitio de Cloudflare no se pudo probar desde aquí porque
 depende de pasos que usted realiza. Hasta completar las partes 2 a 10,
 no considere el sistema listo para uso real.
 
+Lo que NO se pudo probar desde aquí y debe comprobar usted:
+  - El inicio de sesión con su cuenta real (parte 18, paso 6).
+  - Que el menú "Sistema de ventas" aparezca en su hoja.
+  - El tiempo que tarda "Entrar": la huella de la contraseña se
+    calcula 2000 veces a propósito (para frenar a quien intente
+    adivinarla). En Google debería tardar menos de 1 o 2 segundos; si
+    tarda mucho más, avíseme y se ajusta.
+  - Que Cloudflare aplique los encabezados de _headers (parte 18,
+    paso 8).
+
 Nota técnica: el servidor recalcula subtotales y totales y rechaza la
 venta si no coinciden con lo que envió la tablet, valida que precios y
-cantidades sean enteros positivos y que el producto exista. Acepta el
-precio que tenía la tablet al momento de vender (no el precio actual
-de PRODUCTOS) para que una venta pendiente enviada horas después
-conserve el precio con que se cobró.
+cantidades sean enteros positivos y que el producto exista. Exige el
+precio actual de PRODUCTOS, salvo en ventas hechas ANTES del último
+cambio de precios (por ejemplo una pendiente por falta de Internet),
+que conservan el precio con que se cobraron.
+
+
+==================================================================
+ 18. ACTUALIZAR DESDE LA VERSIÓN ANTERIOR (agregar inicio de sesión)
+==================================================================
+
+Si ya tenía la hoja y la página funcionando con la "clave de acceso",
+haga solo esto. Sus ventas y productos NO se tocan.
+
+1. Apps Script (Extensiones > Apps Script en su hoja):
+   a. Abra Código.gs, borre todo y pegue el apps-script/Codigo.gs
+      nuevo. Guarde.
+   b. Cree el archivo Usuarios.gs (parte 3, paso 5) y pegue
+      apps-script/Usuarios.gs. Guarde.
+2. Publique la versión nueva:
+   Implementar > Gestionar implementaciones > lápiz (editar) >
+   Versión: "Nueva versión" > Implementar.
+   (Si pide permisos nuevos, acéptelos. La URL no cambia.)
+3. En el editor elija la función "inicializar" y toque "Ejecutar".
+   Se crea la pestaña USUARIOS.
+4. Cree su usuario ADMIN y los demás (parte 3, paso 8).
+5. Ya no se usa CLAVE_ACCESO. Bórrela: Configuración del proyecto
+   (engranaje) > Propiedades de la secuencia de comandos > junto a
+   CLAVE_ACCESO toque "Borrar" > Guardar. (No borre otras propiedades
+   que empiecen con S_ o PRODUCTOS_CAMBIO: son del sistema.)
+6. Suba a GitHub los archivos nuevos y cambiados: index.html,
+   styles.css, script.js, sw.js, _headers, instrucciones.txt,
+   seguridad.txt, la carpeta apps-script (con Usuarios.gs), y la
+   carpeta vendor. (logica.js y pruebas/ también, aunque casi no
+   cambiaron.)
+7. Espere 2 minutos, abra la página en la tablet y recárguela. Debe
+   aparecer "Iniciar sesión". La URL de Apps Script ya estaba
+   guardada en la tablet; entre con su usuario y contraseña.
+   (La clave vieja que estaba guardada en la tablet se borra sola.)
+8. Comprobar los encabezados de seguridad (opcional): en una
+   computadora abra la página, toque F12 > pestaña "Red" (Network),
+   recargue, toque la primera fila y busque en "Encabezados de
+   respuesta" la línea Content-Security-Policy. Si aparece, _headers
+   está funcionando. Si no aparece, revise que _headers esté en la
+   raíz del repositorio (junto a index.html).
+9. Haga una venta de prueba y revise que aparezca en VENTAS.
